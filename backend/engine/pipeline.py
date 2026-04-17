@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import time
 import uuid
 from datetime import date
 from typing import Any, Optional
@@ -117,9 +118,33 @@ class SessionState:
         self.parse_cache: dict[str, list[str]] = {}  # pdf_bytes_hash -> parsed pages
         self.timelines: Optional[dict[str, FieldTimeline]] = None
         self.evaluation_date: Optional[date] = None
+        self.last_accessed: float = time.time()
 
 
 SESSIONS: dict[str, SessionState] = {}
+
+# TTL for idle sessions. Default 2h; override with SESSION_TTL_SECONDS env var.
+# Sessions not touched within this window are evicted on the next start_session
+# call. Evaluations also bump last_accessed so an in-progress session never
+# gets killed mid-flight.
+SESSION_TTL_SECONDS: int = int(os.getenv("SESSION_TTL_SECONDS", "7200"))
+
+
+def _sweep_expired_sessions() -> int:
+    """Remove sessions idle beyond SESSION_TTL_SECONDS. Returns count removed."""
+    now = time.time()
+    expired = [
+        sid for sid, sess in SESSIONS.items()
+        if now - sess.last_accessed > SESSION_TTL_SECONDS
+    ]
+    for sid in expired:
+        del SESSIONS[sid]
+    if expired:
+        logger.info(
+            "Session sweep: evicted %d idle session(s) (ttl=%ds, active=%d)",
+            len(expired), SESSION_TTL_SECONDS, len(SESSIONS),
+        )
+    return len(expired)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -127,7 +152,12 @@ SESSIONS: dict[str, SessionState] = {}
 # ═══════════════════════════════════════════════════════════════════════════
 
 def start_session() -> str:
-    """Create a new empty session. Returns session_id."""
+    """Create a new empty session. Returns session_id.
+
+    Opportunistically sweeps expired sessions on each new-session request —
+    keeps the in-memory SESSIONS dict bounded without needing a background task.
+    """
+    _sweep_expired_sessions()
     session_id = str(uuid.uuid4())
     session = SessionState(session_id)
     SESSIONS[session_id] = session
@@ -891,6 +921,7 @@ async def evaluate(
             for streaming progress updates to the frontend.
     """
     session = SESSIONS[session_id]
+    session.last_accessed = time.time()  # Keep alive; don't let sweep evict us.
     evaluation_date = date.fromisoformat(evaluation_date_str)
 
     # ── Debug trace ──────────────────────────────────────────────────
