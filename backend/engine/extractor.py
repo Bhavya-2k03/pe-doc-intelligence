@@ -192,35 +192,31 @@ async def extract_email(
 
     logger.info("Extracting email %s (hash=%s...)", email_id, pkg_hash[:12])
 
-    try:
-        raw_output = await _call_extraction_llm(
-            package, field_registry, openai_client,
-        )
-        result = _parse_extraction_output(raw_output)
+    # Intentionally NOT wrapped in a broad try/except — we want transient
+    # upstream failures (OpenAI timeout, rate limit, malformed output) to
+    # propagate up to main.py's run_pipeline so the user sees a clean retry
+    # message instead of silently getting empty extractions + a downstream
+    # "No result received from pipeline" error.
+    raw_output = await _call_extraction_llm(
+        package, field_registry, openai_client,
+    )
+    result = _parse_extraction_output(raw_output)
 
-        # Fallback: if a clause has no date at all, use email_data.date.
-        # This guarantees every clause has a resolvable document_date.
-        email_date = email_data.get("date")
-        if email_date:
-            # Normalize to YYYY-MM-DD
-            email_date_str = email_date.split("T")[0] if "T" in email_date else email_date
-            for clause in result.clauses:
-                if (clause.source_signed_date is None
-                    and clause.source_effective_date is None
-                    and clause.source_effective_date_condition is None):
-                    clause.source_signed_date = email_date_str
-                    logger.info(
-                        "Clause missing all dates, falling back to email date %s: %s",
-                        email_date_str, clause.clause_text[:60],
-                    )
-
-    except Exception:
-        logger.exception("Extraction failed for email %s, returning empty", email_id)
-        result = ExtractionResult(
-            extracted_fields={},
-            clauses=[],
-            document_intent=[],
-        )
+    # Fallback: if a clause has no date at all, use email_data.date.
+    # This guarantees every clause has a resolvable document_date.
+    email_date = email_data.get("date")
+    if email_date:
+        # Normalize to YYYY-MM-DD
+        email_date_str = email_date.split("T")[0] if "T" in email_date else email_date
+        for clause in result.clauses:
+            if (clause.source_signed_date is None
+                and clause.source_effective_date is None
+                and clause.source_effective_date_condition is None):
+                clause.source_signed_date = email_date_str
+                logger.info(
+                    "Clause missing all dates, falling back to email date %s: %s",
+                    email_date_str, clause.clause_text[:60],
+                )
 
     extraction_cache[pkg_hash] = result
     return result

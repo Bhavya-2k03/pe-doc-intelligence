@@ -19,7 +19,13 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
-from openai import AsyncOpenAI
+from openai import (
+    AsyncOpenAI,
+    APITimeoutError,
+    APIConnectionError,
+    RateLimitError,
+    APIStatusError,
+)
 from pydantic import BaseModel
 
 from constants import emails_and_attachment_fields
@@ -445,9 +451,26 @@ async def session_evaluate(session_id: str, body: EvaluateRequest):
             # Signal completion
             await progress_queue.put({"__result__": result})
 
+        except (APITimeoutError, APIConnectionError) as exc:
+            logger.warning("OpenAI transient error: %s", exc)
+            await progress_queue.put({
+                "__error__": "OpenAI timed out. Click Evaluate to retry.",
+            })
+        except RateLimitError as exc:
+            logger.warning("OpenAI rate limit: %s", exc)
+            await progress_queue.put({
+                "__error__": "OpenAI rate limit hit. Wait 30 seconds and click Evaluate to retry.",
+            })
+        except APIStatusError as exc:
+            logger.warning("OpenAI API error (status=%s): %s", exc.status_code, exc)
+            await progress_queue.put({
+                "__error__": f"OpenAI returned an error (status {exc.status_code}). Click Evaluate to retry.",
+            })
         except Exception as exc:
             logger.exception("Pipeline failed")
-            await progress_queue.put({"__error__": str(exc)})
+            await progress_queue.put({
+                "__error__": f"Pipeline error: {exc}. Click Evaluate to retry.",
+            })
 
     async def event_stream():
         """Yield SSE events from the progress queue."""
