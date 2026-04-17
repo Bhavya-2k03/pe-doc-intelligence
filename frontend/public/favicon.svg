@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <!-- Rounded dark surface, matching the app's canvas -->
+  <rect width="48" height="48" rx="11" fill="#0a0a0f"/>
+  <rect x="0.5" y="0.5" width="47" height="47" rx="10.5" stroke="rgba(255,255,255,0.09)"/>
+
+  <!-- Descending fee-timeline bars, echoing VerifyFigure in the product -->
+  <g stroke="#22d3ee" stroke-width="3.5" stroke-linecap="round">
+    <line x1="13.5" y1="34" x2="13.5" y2="17"/>
+    <line x1="21"   y1="34" x2="21"   y2="22" opacity="0.85"/>
+    <line x1="28.5" y1="34" x2="28.5" y2="27" opacity="0.7"/>
+    <line x1="36"   y1="34" x2="36"   y2="31" opacity="0.55"/>
+  </g>
+
+  <!-- Baseline axis, very faint -->
+  <line x1="10" y1="36.5" x2="39" y2="36.5"
+    stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-linecap="round"/>
+</svg>

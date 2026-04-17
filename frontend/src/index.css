@@ -1,0 +1,569 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #06070b;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+#root { min-height: 100vh; }
+
+/* Scrollbar — ultra thin Bloomberg style */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+.font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* ═══════════════════════════════════════════════
+   BLOOMBERG TERMINAL EFFECTS
+   ═══════════════════════════════════════════════ */
+
+/* Panel backgrounds with subtle grid texture */
+.panel-bg {
+  background-color: #0a0b10;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.panel-solid {
+  background-color: #0c0d13;
+}
+
+.panel-raised {
+  background-color: #0e0f16;
+}
+
+/* Section header labels — Bloomberg style */
+.section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.section-label-cyan {
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.08);
+  border: 1px solid rgba(34, 211, 238, 0.15);
+}
+
+.section-label-amber {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.12);
+}
+
+.section-label-emerald {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.12);
+}
+
+.section-label-violet {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.08);
+  border: 1px solid rgba(167, 139, 250, 0.12);
+}
+
+.section-label-rose {
+  color: #fb7185;
+  background: rgba(251, 113, 133, 0.08);
+  border: 1px solid rgba(251, 113, 133, 0.12);
+}
+
+.section-label-slate {
+  color: #64748b;
+  background: rgba(100, 116, 139, 0.06);
+  border: 1px solid rgba(100, 116, 139, 0.1);
+}
+
+/* Glow effects — refined */
+.glow-green { box-shadow: 0 0 20px rgba(16, 185, 129, 0.12), inset 0 1px 0 rgba(16, 185, 129, 0.1); }
+.glow-red { box-shadow: 0 0 20px rgba(239, 68, 68, 0.12), inset 0 1px 0 rgba(239, 68, 68, 0.1); }
+.glow-blue { box-shadow: 0 0 20px rgba(59, 130, 246, 0.08); }
+.glow-cyan { box-shadow: 0 0 15px rgba(34, 211, 238, 0.06); }
+
+/* Status pulse */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.status-pulse { animation: status-pulse 2s ease-in-out infinite; }
+
+/* Scanline overlay — very subtle */
+.scanline-overlay {
+  position: relative;
+}
+.scanline-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* Ticker bar animation */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ticker-scroll {
+  animation: ticker-scroll 60s linear infinite;
+}
+.ticker-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Count-up number animation */
+@keyframes number-appear {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.number-appear {
+  animation: number-appear 0.4s ease-out;
+}
+
+/* Bloomberg-style divider */
+.bloomberg-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.06) 80%, transparent);
+}
+
+/* Panel border style */
+.panel-border {
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Keyboard shortcut badge */
+.kbd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #475569;
+  line-height: 1.4;
+}
+
+/* Data cell highlight on hover */
+.data-row:hover {
+  background: rgba(34, 211, 238, 0.03);
+}
+
+/* Verdict card — oversized display */
+.verdict-match {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.06), rgba(16, 185, 129, 0.02));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.verdict-mismatch {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Document type badges */
+.doc-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* Smooth section collapse */
+.section-collapse {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+/* Active evaluation indicator */
+@keyframes eval-border {
+  0%, 100% { border-color: rgba(34, 211, 238, 0.15); }
+  50% { border-color: rgba(34, 211, 238, 0.4); }
+}
+.eval-active {
+  animation: eval-border 1.5s ease-in-out infinite;
+}
+
+/* Bloomberg-style input */
+.bb-input {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-family: 'JetBrains Mono', monospace;
+  background: #08090d;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  color: #e2e8f0;
+  color-scheme: dark;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.bb-input:focus {
+  border-color: rgba(34, 211, 238, 0.35);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.1);
+}
+.bb-input::placeholder {
+  color: #1e293b;
+}
+
+/* Primary button */
+.bb-btn-primary {
+  height: 36px;
+  padding: 0 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: #22d3ee;
+  color: #06070b;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+}
+.bb-btn-primary:hover { background: #06b6d4; }
+.bb-btn-primary:active { transform: scale(0.98); }
+.bb-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* Ghost button */
+.bb-btn-ghost {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.03);
+  color: #64748b;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+.bb-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Table styles */
+.bb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.bb-table th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #475569;
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+.bb-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.025);
+  color: #94a3b8;
+  font-size: 12px;
+}
+.bb-table tr:hover td {
+  background: rgba(34, 211, 238, 0.02);
+}
+
+/* Landing page specific */
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor-blink {
+  animation: terminal-blink 1s step-end infinite;
+}
+
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.fade-up-delay-1 { animation-delay: 0.15s; opacity: 0; }
+.fade-up-delay-2 { animation-delay: 0.3s; opacity: 0; }
+.fade-up-delay-3 { animation-delay: 0.45s; opacity: 0; }
+.fade-up-delay-4 { animation-delay: 0.6s; opacity: 0; }
+.fade-up-delay-5 { animation-delay: 0.75s; opacity: 0; }
+
+/* ── Landing page illustrations (isometric wireframe) ── */
+
+/* All strokes brighten on hover */
+.illus-root polygon,
+.illus-root line,
+.illus-root polyline {
+  transition: stroke 0.4s ease, opacity 0.4s ease;
+}
+.illus-root:hover polygon,
+.illus-root[data-revealed='true'] polygon { stroke: rgba(255,255,255,0.18); }
+.illus-root:hover line,
+.illus-root[data-revealed='true'] line { stroke: rgba(255,255,255,0.1); }
+.illus-root:hover polygon { stroke: rgba(255,255,255,0.22); }
+.illus-root:hover line { stroke: rgba(255,255,255,0.12); }
+
+/* Floating element — lifts on hover */
+.illus-float {
+  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.illus-root:hover .illus-float {
+  transform: translateY(-8px);
+}
+
+/* Marching ants — play on hover */
+@keyframes illus-march {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -10; }
+}
+.illus-marching { transition: stroke 0.4s ease; }
+.illus-root:hover .illus-marching {
+  stroke: rgba(255,255,255,0.1) !important;
+  animation: illus-march 1.2s linear infinite;
+}
+
+/* Scan line — sweeps on hover */
+@keyframes illus-scan {
+  0% { transform: translateY(0); opacity: 0; }
+  6% { opacity: 0.7; }
+  88% { opacity: 0.7; }
+  100% { transform: translateY(-108px); opacity: 0; }
+}
+.illus-scanning { opacity: 0; }
+.illus-root:hover .illus-scanning {
+  animation: illus-scan 4s ease-in-out infinite;
+}
+
+/* Lens pulse on hover */
+@keyframes illus-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; stroke-width: 1.1; }
+}
+.illus-pulsing { transition: stroke 0.4s ease; }
+.illus-root:hover .illus-pulsing {
+  animation: illus-pulse 3s ease-in-out infinite;
+}
+
+/* Bar lift on hover — staggered via inline transition-delay */
+.illus-bar {
+  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.illus-root:hover .illus-bar {
+  transform: translateY(-3px);
+}
+
+/* ── Illustration reveal (one-shot, played when the figure scrolls into view) ──
+ * Reuses the hover animation vocabulary but with finite iteration counts
+ * so each figure "performs" once and then settles. Hover still triggers
+ * the infinite-loop versions, since those selectors appear later in the
+ * cascade and win when both apply.
+ */
+@keyframes illus-float-reveal {
+  0%, 100% { transform: translateY(0); }
+  40%, 60% { transform: translateY(-8px); }
+}
+@keyframes illus-bar-reveal {
+  0%, 100% { transform: translateY(0); }
+  40%, 60% { transform: translateY(-3px); }
+}
+
+.illus-root[data-revealed='true']:not(:hover) .illus-scanning {
+  animation: illus-scan 4s ease-in-out 1;
+}
+.illus-root[data-revealed='true']:not(:hover) .illus-pulsing {
+  animation: illus-pulse 3s ease-in-out 2;
+}
+.illus-root[data-revealed='true']:not(:hover) .illus-marching {
+  stroke: rgba(255,255,255,0.1);
+  animation: illus-march 1.2s linear 4;
+}
+.illus-root[data-revealed='true']:not(:hover) .illus-float {
+  animation: illus-float-reveal 2.2s cubic-bezier(0.22,1,0.36,1) 1;
+}
+.illus-root[data-revealed='true']:not(:hover) .illus-bar {
+  animation: illus-bar-reveal 1.8s cubic-bezier(0.22,1,0.36,1) 1;
+}
+
+/* During hover, the hover selectors (earlier in this file) match and
+ * the reveal rules above don't (they require :not(:hover)). Hover cleanly
+ * takes over with its infinite-loop animations. */
+
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.gradient-text {
+  background: linear-gradient(135deg, #22d3ee, #a78bfa, #22d3ee);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 6s ease infinite;
+}
+
+/* Linear-style hero glow */
+.hero-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.07;
+  pointer-events: none;
+}
+
+/* Linear-style feature card */
+.feature-card {
+  background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+.feature-card:hover {
+  border-color: rgba(255,255,255,0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+  transform: translateY(-2px);
+}
+
+/* Radial grid background */
+.grid-bg {
+  background-image:
+    radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Subtle text shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-text {
+  background: linear-gradient(90deg, #94a3b8, #e2e8f0, #94a3b8);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 8s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════
+   PREMIUM LANDING ANIMATIONS
+   Shared easing, ambient hero grid, section tracer.
+   Paired with components in src/components/landing/Premium.jsx.
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* Linear-style refined ease (used across premium landing animations) */
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Hero — slow descending scan band behind the grid */
+@keyframes premium-scan-down {
+  0%   { transform: translate3d(0, -30%, 0); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translate3d(0, 120%, 0); opacity: 0; }
+}
+
+.premium-scan-sweep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 220px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.018) 40%,
+    rgba(34, 211, 238, 0.045) 50%,
+    rgba(34, 211, 238, 0.018) 60%,
+    transparent 100%
+  );
+  filter: blur(1px);
+  will-change: transform, opacity;
+  animation: premium-scan-down 16s var(--ease-premium) infinite;
+  animation-delay: 1.6s;
+}
+
+/* Section label — 40px tracer rule that draws in on reveal */
+.premium-tracer {
+  display: inline-block;
+  height: 1px;
+  width: 40px;
+  background: linear-gradient(
+    90deg,
+    rgba(34, 211, 238, 0.55) 0%,
+    rgba(34, 211, 238, 0.15) 100%
+  );
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.9s var(--ease-premium);
+}
+.premium-tracer[data-revealed='true'] {
+  transform: scaleX(1);
+}
+
+/* Reduced motion — honour the user preference */
+@media (prefers-reduced-motion: reduce) {
+  .premium-scan-sweep {
+    animation: none;
+    opacity: 0;
+  }
+  .premium-tracer {
+    transition: none;
+    transform: scaleX(1);
+  }
+  .illus-marching,
+  .illus-scanning,
+  .illus-pulsing {
+    animation: none !important;
+  }
+  .illus-root[data-revealed='true']:not(:hover) .illus-float,
+  .illus-root[data-revealed='true']:not(:hover) .illus-bar {
+    animation: none !important;
+  }
+  .fade-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

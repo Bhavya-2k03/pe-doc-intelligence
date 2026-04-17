@@ -1,0 +1,48 @@
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+venv/
+.venv/
+*.egg-info/
+
+# ── Secrets & local config ────────────────────────────────
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# ── Node / frontend build ─────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Runtime / generated files ─────────────────────────────
+*.log
+demo_output/
+backend/debug_output/
+backend/db.sqlite
+backend/files/
+backend/_deprecated/
+test_prompt_output.txt
+sqlite3.exe
+
+# ── Editor & OS ───────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ── Tools & agents ────────────────────────────────────────
+.claude/
+
+# ── Internal docs (not for public repo) ───────────────────
+CLAUDE.md
+ARCHITECTURE.md
+FRONTEND_SPEC.md
+FRONTEND_CONTEXT.md
