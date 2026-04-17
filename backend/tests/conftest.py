@@ -29,6 +29,18 @@ def lit(value, value_type="number"):
     return ASTNode(node_type="literal", value=value, value_type=value_type,
                    op=None, field=None, fn=None, args=None)
 
+def lit_none():
+    """A literal None node — useful for testing AST-op None-safety without
+    going through field_ref (which now raises MissingFieldValueError).
+
+    Uses model_construct to bypass the validator (a "literal" node with
+    value=None isn't produced by the LLM; this is strictly a test fixture
+    to inject None into downstream AST evaluation)."""
+    return ASTNode.model_construct(
+        node_type="literal", value=None, value_type=None,
+        op=None, field=None, fn=None, args=None,
+    )
+
 def lit_date(value):
     return ASTNode(node_type="literal", value=value, value_type="date",
                    op=None, field=None, fn=None, args=None)

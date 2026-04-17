@@ -19,8 +19,19 @@ from engine.timeline_engine import (
     evaluate_ast,
 )
 from tests.conftest import (
-    comparison, fn_call, lit, lit_date, field_ref,
+    comparison, fn_call, lit, lit_date, lit_none, field_ref,
     temporal, aggregator,
+)
+
+# The tests below that inject None into AST-op arguments were originally written
+# against the old permissive behavior where field_ref returned None for missing
+# fields. Now field_ref raises MissingFieldValueError, and the ASTNode validator
+# rejects literal nodes with value=None — so None can no longer appear as an
+# arithmetic/comparison/temporal operand in any code path the LLM or engine
+# produces. Skipping rather than deleting to preserve the test intent if we
+# ever reintroduce a None-producing node type.
+_NONE_ARG_UNREACHABLE = pytest.mark.skip(
+    reason="None-as-AST-op-arg is no longer reachable; field_ref now raises."
 )
 
 
@@ -82,29 +93,32 @@ class TestAggregatorRobustness:
         result = evaluate_ast(node, timelines_with_string_dates, ctx)
         assert result == date(2029, 1, 15)
 
+    @_NONE_ARG_UNREACHABLE
     def test_min_with_none(self, empty_timelines, ctx):
         """MIN(date, None) — missing field_ref returns None."""
         node = aggregator("MIN",
             lit_date("2029-01-15"),
-            field_ref("nonexistent_field"),
+            lit_none(),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result == date(2029, 1, 15)  # None filtered out
 
+    @_NONE_ARG_UNREACHABLE
     def test_max_with_none(self, empty_timelines, ctx):
         """MAX(None, date) — None filtered out."""
         node = aggregator("MAX",
-            field_ref("nonexistent_field"),
+            lit_none(),
             lit_date("2029-01-15"),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result == date(2029, 1, 15)
 
+    @_NONE_ARG_UNREACHABLE
     def test_min_all_none(self, empty_timelines, ctx):
         """MIN(None, None) — all None returns None."""
         node = aggregator("MIN",
-            field_ref("a"),
-            field_ref("b"),
+            lit_none(),
+            lit_none(),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is None
@@ -147,29 +161,32 @@ class TestComparisonRobustness:
         # "2029-01-15" coerced to date >= 2025-01-01 → True
         assert result is True
 
+    @_NONE_ARG_UNREACHABLE
     def test_comparison_left_none(self, empty_timelines, ctx):
         """None >= 50 — left is None from missing field."""
         node = comparison(">=",
-            field_ref("nonexistent"),
+            lit_none(),
             lit(50),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is False  # None safety → False
 
+    @_NONE_ARG_UNREACHABLE
     def test_comparison_right_none(self, empty_timelines, ctx):
         """50 >= None — right is None."""
         node = comparison(">=",
             lit(50),
-            field_ref("nonexistent"),
+            lit_none(),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is False
 
+    @_NONE_ARG_UNREACHABLE
     def test_comparison_both_none(self, empty_timelines, ctx):
         """None >= None."""
         node = comparison(">=",
-            field_ref("a"),
-            field_ref("b"),
+            lit_none(),
+            lit_none(),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is False
@@ -218,19 +235,21 @@ class TestTemporalRobustness:
         result = evaluate_ast(node, timelines_with_string_dates, ctx)
         assert result == date(2026, 6, 15)
 
+    @_NONE_ARG_UNREACHABLE
     def test_add_days_none_base(self, empty_timelines, ctx):
         """ADD_DAYS(None, 90) — None base returns None."""
         node = temporal("ADD_DAYS",
-            field_ref("nonexistent"),
+            lit_none(),
             lit(90),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is None
 
+    @_NONE_ARG_UNREACHABLE
     def test_add_years_none_base(self, empty_timelines, ctx):
         """ADD_YEARS(None, 5) — None base returns None."""
         node = temporal("ADD_YEARS",
-            field_ref("nonexistent"),
+            lit_none(),
             lit(5),
         )
         result = evaluate_ast(node, empty_timelines, ctx)
@@ -244,20 +263,22 @@ class TestTemporalRobustness:
 
 class TestArithmeticRobustness:
 
+    @_NONE_ARG_UNREACHABLE
     def test_add_none_left(self, empty_timelines, ctx):
         """None + 1 — returns None."""
         node = ASTNode(
             node_type="arithmetic", op="ADD",
-            args=[field_ref("nonexistent"), lit(1)],
+            args=[lit_none(), lit(1)],
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is None
 
+    @_NONE_ARG_UNREACHABLE
     def test_sub_none_right(self, empty_timelines, ctx):
         """1 - None — returns None."""
         node = ASTNode(
             node_type="arithmetic", op="SUB",
-            args=[lit(1), field_ref("nonexistent")],
+            args=[lit(1), lit_none()],
         )
         result = evaluate_ast(node, empty_timelines, ctx)
         assert result is None
@@ -345,6 +366,7 @@ class TestComplexExpressions:
         # FUND_REALIZATION_PCT returns 0 when no data → 0 >= 50 → False
         assert result is False
 
+    @_NONE_ARG_UNREACHABLE
     def test_nested_min_with_none_and_dates(self, timelines_with_string_dates, ctx):
         """MIN(field_ref(exists), field_ref(missing), literal_date)
 
@@ -352,7 +374,7 @@ class TestComplexExpressions:
         """
         node = aggregator("MIN",
             field_ref("fund_investment_end_date"),    # "2029-01-15"
-            field_ref("nonexistent_field"),           # None
+            lit_none(),           # None
             lit_date("2030-06-01"),                    # date
         )
         result = evaluate_ast(node, timelines_with_string_dates, ctx)

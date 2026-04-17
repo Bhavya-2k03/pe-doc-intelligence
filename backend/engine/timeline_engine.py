@@ -20,6 +20,18 @@ from engine.models import ASTNode, ClauseInstruction
 logger = logging.getLogger(__name__)
 
 
+class MissingFieldValueError(Exception):
+    """Raised when an AST field_ref resolves to a field that has no value at
+    the query date. Surfaces to the user via main.py's SSE error handler as
+    a non-technical message guiding them to add the missing report email.
+    """
+
+    def __init__(self, field: str, query_date):
+        self.field = field
+        self.query_date = query_date
+        super().__init__(f"No value for field '{field}' at {query_date}")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # Data Structures
 # ═══════════════════════════════════════════════════════════════════════════
@@ -471,9 +483,14 @@ def evaluate_ast(
             return ctx.document_date
         tl = timelines.get(field)
         if tl is None:
-            logger.warning("field_ref '%s' not found in timelines", field)
-            return None
-        return tl.value_at(ctx.evaluation_date)
+            # Field never populated — no seed entry, no extracted value.
+            raise MissingFieldValueError(field, ctx.evaluation_date)
+        val = tl.value_at(ctx.evaluation_date)
+        if val is None:
+            # Timeline exists but has no entry covering this date (e.g. a
+            # report email is dated after ctx.evaluation_date).
+            raise MissingFieldValueError(field, ctx.evaluation_date)
+        return val
 
     # ── evaluate args (shared by most branch nodes) ───────────────────
     evaluated_args = []

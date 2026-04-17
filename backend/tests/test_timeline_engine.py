@@ -353,9 +353,12 @@ class TestEvaluateAST:
         result = evaluate_ast(field_ref("management_fee_rate"), timelines, ctx)
         assert result == 2.0
 
-    def test_field_ref_missing_returns_none(self, timelines, ctx):
-        result = evaluate_ast(field_ref("nonexistent_field"), timelines, ctx)
-        assert result is None
+    def test_field_ref_missing_raises(self, timelines, ctx):
+        from engine.timeline_engine import MissingFieldValueError
+        import pytest as _pytest
+        with _pytest.raises(MissingFieldValueError) as exc_info:
+            evaluate_ast(field_ref("nonexistent_field"), timelines, ctx)
+        assert exc_info.value.field == "nonexistent_field"
 
     def test_comparison_gte_true(self, timelines, ctx):
         node = comparison("GTE", lit(50), lit(50))

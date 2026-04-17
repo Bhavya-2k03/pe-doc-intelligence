@@ -32,6 +32,31 @@ from constants import emails_and_attachment_fields
 from engine.extractor import extract_all_emails
 from engine.pdf_parser import parse_attachments
 from engine.pipeline import evaluate, start_session, SESSIONS
+from engine.timeline_engine import MissingFieldValueError
+
+# Field display names for user-facing error messages. Anything not in this
+# map falls back to a title-case humanized version of the snake_case name.
+FIELD_DISPLAY_NAMES: dict[str, str] = {
+    "fund_percentage_realized": "Fund Realization Percentage",
+    "investor_percentage_realized": "Investor Realization Percentage",
+    "investor_invested_capital": "Invested Capital",
+    "fund_total_invested_capital": "Total Fund Invested Capital",
+    "fund_total_paid_in_capital": "Total Fund Paid-In Capital",
+    "investor_total_realized_capital": "Total Realized Capital",
+    "investor_commitment_amount": "LP Commitment Amount",
+    "total_fund_commitment": "Total Fund Commitment",
+    "management_fee_rate": "Management Fee Rate",
+    "management_fee_basis": "Management Fee Basis",
+    "management_fee_billing_cadence": "Billing Cadence",
+    "fund_initial_closing_date": "Initial Closing Date",
+    "fund_final_closing_date": "Final Closing Date",
+    "fund_investment_end_date": "Investment Period End",
+    "fund_term_end_date": "Fund Term End",
+}
+
+
+def _humanize_field(field: str) -> str:
+    return FIELD_DISPLAY_NAMES.get(field, field.replace("_", " ").title())
 
 load_dotenv()
 
@@ -451,6 +476,17 @@ async def session_evaluate(session_id: str, body: EvaluateRequest):
             # Signal completion
             await progress_queue.put({"__result__": result})
 
+        except MissingFieldValueError as exc:
+            logger.info("Missing field value: %s at %s", exc.field, exc.query_date)
+            display_name = _humanize_field(exc.field)
+            await progress_queue.put({
+                "__error__": (
+                    f"Missing data: one of your clauses needs the {display_name} "
+                    f"as of {exc.query_date}, but it isn't reported in any email. "
+                    f"Add an email (dated on or before {exc.query_date}) that "
+                    f"reports this value, then click Evaluate again."
+                ),
+            })
         except (APITimeoutError, APIConnectionError) as exc:
             logger.warning("OpenAI transient error: %s", exc)
             await progress_queue.put({
