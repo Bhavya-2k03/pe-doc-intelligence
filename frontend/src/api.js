@@ -30,8 +30,42 @@ export async function evaluate(sessionId, payload, onProgress) {
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  // SSE parser state — MUST persist across chunk boundaries. Large events
+  // (especially the final `result`) routinely span multiple read() calls, so
+  // these cannot be function-local to the while loop.
   let buffer = '';
+  let eventType = null;
+  let dataBuffer = '';
   let finalResult = null;
+
+  const dispatch = () => {
+    // Called on every blank line (per SSE spec, blank line = event terminator).
+    if (!eventType || !dataBuffer) {
+      eventType = null;
+      dataBuffer = '';
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(dataBuffer);
+    } catch (e) {
+      // Malformed JSON in an event — skip and keep streaming.
+      eventType = null;
+      dataBuffer = '';
+      return;
+    }
+    if (eventType === 'progress' && onProgress) {
+      onProgress(parsed);
+    } else if (eventType === 'result') {
+      finalResult = parsed;
+    } else if (eventType === 'error') {
+      eventType = null;
+      dataBuffer = '';
+      throw new Error(parsed.error || 'Pipeline error');
+    }
+    eventType = null;
+    dataBuffer = '';
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -39,33 +73,23 @@ export async function evaluate(sessionId, payload, onProgress) {
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Parse SSE events from buffer
     const lines = buffer.split('\n');
-    buffer = lines.pop() || ''; // keep incomplete last line
+    buffer = lines.pop() || ''; // keep incomplete trailing line for next chunk
 
-    let eventType = null;
     for (const line of lines) {
-      if (line.startsWith('event: ')) {
+      if (line === '') {
+        dispatch();
+      } else if (line.startsWith('event: ')) {
         eventType = line.slice(7).trim();
       } else if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        try {
-          const parsed = JSON.parse(data);
-          if (eventType === 'progress' && onProgress) {
-            onProgress(parsed);
-          } else if (eventType === 'result') {
-            finalResult = parsed;
-          } else if (eventType === 'error') {
-            throw new Error(parsed.error || 'Pipeline error');
-          }
-        } catch (e) {
-          if (eventType === 'error') throw e;
-          // Ignore JSON parse errors for incomplete chunks
-        }
-        eventType = null;
+        // Per SSE spec, multiple data: lines within one event are joined by \n.
+        dataBuffer += (dataBuffer ? '\n' : '') + line.slice(6);
       }
     }
   }
+
+  // Flush any residual event (e.g., server didn't send a trailing blank line).
+  dispatch();
 
   if (!finalResult) throw new Error('No result received from pipeline');
   return finalResult;
