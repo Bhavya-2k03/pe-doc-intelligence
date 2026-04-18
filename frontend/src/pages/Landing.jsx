@@ -175,7 +175,7 @@ export default function Landing() {
               </div>
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
-                Documented fee dispersion between LPs in the same fund — often tens
+                Documented fee dispersion between LPs in the same fund. Often tens
                 of basis points, material on any meaningful commitment
                 (Begenau &amp; Siriwardane, 2022).
               </div>
