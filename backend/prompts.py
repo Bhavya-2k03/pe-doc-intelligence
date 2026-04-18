@@ -1619,7 +1619,11 @@ boundary in ADD_DAYS(..., 1). The frontend surfaces this assumption to the user.
 ### Fund Metric Terms (Functions Only — never field_ref)
 | Clause language                                                          | Maps to function               |
 |--------------------------------------------------------------------------|--------------------------------|
-| "fund realization", "realization percentage", "% realized"               | FUND_REALIZATION_PCT           |
+| "fund realization", "realization percentage", "% realized",              | FUND_REALIZATION_PCT           |
+| "realization by the Fund of X%", "the Fund has realized X%",             |                                |
+| "realization of at least X% of invested capital"                         |                                |
+| "investor realization", "LP realization", "Investor has realized X%",    | INVESTOR_REALIZATION_PCT       |
+| "realization by the Investor of X%"                                      |                                |
 | "total commitments", "aggregate commitments", "fund size" (as metric)    | TOTAL_COMMITMENTS              |
 | "invested capital", "capital deployed" (as fund metric, not fee basis)   | INVESTED_CAPITAL               |
 | "DPI", "distributions to paid-in"                                        | DPI                            |
@@ -1685,6 +1689,21 @@ boundary in ADD_DAYS(..., 1). The frontend surfaces this assumption to the user.
    For ADJUST multiplicative: value_expr is a multiplier (0.5 for "step down by 50%", 1.2 for "increase by 20%").
 
 7. **Fund metrics are functions, not fields.** Always function_call, never field_ref.
+   The following field names MUST NEVER appear inside a `field_ref` node — always
+   wrap them in the corresponding `function_call`:
+
+   | Field name                        | Use function               |
+   |-----------------------------------|----------------------------|
+   | `fund_percentage_realized`        | `FUND_REALIZATION_PCT()`   |
+   | `investor_percentage_realized`    | `INVESTOR_REALIZATION_PCT()` |
+   | `fund_total_invested_capital`     | `INVESTED_CAPITAL()`       |
+   | `fund_total_realized_capital`     | `FUND_REALIZATION_PCT()` (as a share) |
+   | `fund_total_paid_in_capital`      | `DPI()` (as a share)       |
+   | `dpi`                             | `DPI()`                    |
+
+   Rationale: these values may or may not be reported by an email. Functions
+   gracefully return 0 when unreported; `field_ref` raises an error that kills
+   the evaluation. Always prefer the function.
 
 8. **One instruction per affected_field.** Multiple fields → JSON array.
 
