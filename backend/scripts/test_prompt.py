@@ -24,16 +24,26 @@ from engine.clause_interpreter import interpret_clause
 # CONSTRAIN, GATE, NO_ACTION, multi-field, bounded duration, function dates.
 
 TEST_CLAUSES = [
-    # 1. "next year"
-    # "The management fee shall be reduced to 1.25% effective next year.",
+    # --- Same clause twice (determinism check) ---
+    "Fee increment happening on 15 april 2025 is deffered until fund investment end.",
+    "Fee increment happening on 15 april 2025 is deffered until fund investment end.",
 
-    # 2. "through end of this year"
-    # "Management fees are hereby waived through the end of this year.",
+    # --- Demo date clauses (multi_amendment, mfn, side_letter_flow) ---
 
-    # 3. "beginning of this year"
-    # "The new carried interest rate of 22% shall apply from the beginning of this year.",
+    # Full literal date (Jan 1 2028) + field_ref period end
+    "The Management Fee rate otherwise payable by the Fund shall be reduced from 2.00% to 1.00% per annum for the period commencing January 1, 2028 and ending at the end of the Investment Period.",
 
-    "The Management Fee rate shall be reduced from 2.00% to 1.75% per annum effective as of the next fiscal quarter start date following the expiration of the Commitment Period."
+    # NEXT_FISCAL_QUARTER_START function
+    "The elected terms shall be effective as of the next fiscal quarter following the date of this confirmation.",
+
+    # Temporal ADD_MONTHS (18 months extension)
+    "The Investment Period is hereby extended by eighteen (18) months beyond the previously designated termination date.",
+
+    # ANNIVERSARY function + disjunction with realization condition
+    "The deferred reduction shall become effective only upon the earlier of: (a) the second (2nd) anniversary of the Fund's Final Closing Date or (b) the realization by the Fund of at least fifty percent (50%) of the Fund's aggregate invested capital.",
+
+    # CONSTRAIN (CAP) referencing investment-period-end as field
+    "The annual Management Fee rate payable by the Fund in respect of any period commencing on or after the end of the Investment Period (as then in effect, giving effect to any extension thereof) shall not exceed one and one-quarter percent (1.25%) per annum of the applicable fee basis.",
 ]
 
 TEST_CLAUSES_OLD = [

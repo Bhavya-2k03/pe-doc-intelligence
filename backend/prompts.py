@@ -1662,18 +1662,37 @@ boundary in ADD_DAYS(..., 1). The frontend surfaces this assumption to the user.
 
 1. **Output ONLY JSON.** No explanations, no markdown, no commentary.
 
-2. **Never resolve ambiguous dates.** Full date (day+month+year) → literal.
-   Anything else → function_call or temporal node.
-   - "20 April 2026" → literal "2026-04-20". The day IS specified → MUST be literal.
-   - "April 2026" (no day) → MONTH_START(4, 2026). Only use MONTH_START when day is absent.
-   - Do NOT use MONTH_START, FISCAL_QUARTER_START, or any function when a specific day number
-     appears in the text. A day number means the date is fully resolved → literal.
-   - **This applies to every AST slot — effective_date_expr, gate_move_to_date_expr,
-     condition_ast operands, value_expr when value_type is "date", everything.**
-     A fully-resolved calendar date is always a literal, regardless of which AST
-     field it appears in or what action the instruction is (SET/GATE/CONSTRAIN/ADJUST).
-     Wrapping it in MONTH_START or any other function drops the day and produces
-     a date X days off — silently wrong.
+2. **Date-node-type decision algorithm.** Before emitting any date-valued
+   AST node, run these steps on the date phrase from the clause text:
+
+   - **Step A.** Look at the date phrase in the clause. Identify which
+     calendar components are stated: YEAR, MONTH, DAY.
+   - **Step B.** Choose node type based on what's present:
+     - YEAR + MONTH + **DAY** all present → `node_type="literal"`,
+       `value_type="date"`, `value="YYYY-MM-DD"`. **No function call.**
+     - Day missing (e.g. only month+year, only a quarter, only a year, a
+       relative expression like "next year" or "5 years after X") → use
+       the appropriate node from the Function Registry or a `temporal`
+       node. Match the clause's wording to the registry.
+
+   A day number is any of `1, 2, … 31`, `1st, 2nd, … 31st`, or a spelled-out
+   ordinal ("fifteenth"). If any of these appears alongside a month and year,
+   the date is fully resolved — emit a literal.
+
+   This rule applies to **every** date-valued AST slot — `effective_date_expr`,
+   `effective_end_date_expr`, `gate_move_to_date_expr`, `gate_new_end_date_expr`,
+   `condition_ast` operands, `value_expr` when `value_type` is `"date"`. It does
+   not matter what action the instruction has (SET/GATE/CONSTRAIN/ADJUST) or
+   what phrasing the clause uses ("effective on", "happening on", "scheduled
+   for", "occurring on", "as of", etc.) — only the components present in the
+   date phrase matter.
+
+   **Self-check before returning.** Scan every date-valued AST node you emitted.
+   For each, ask: "did the clause text contain a day number next to this date?"
+   If yes and you wrapped it in any function (MONTH_START, FISCAL_QUARTER_START,
+   MONTH_END, etc.), rewrite it as a literal with the full `YYYY-MM-DD`.
+   Wrapping a fully-resolved date in a function drops the day and produces a
+   date that is silently wrong.
 
 3. **"Reduced TO X" → SET. "Reduced BY X" → ADJUST.** "To" = absolute target.
    "By" = delta. **Exception: ADJUST is ONLY for numeric fields** (rates, amounts,
