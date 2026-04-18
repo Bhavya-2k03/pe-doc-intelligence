@@ -110,10 +110,12 @@ export default function Demo() {
       {/* Status Bar */}
       <StatusBar sessionId={sessionId} evaluating={evaluating} onBack={() => navigate('/')} />
 
-      {/* Main 3-panel workspace */}
+      {/* Main 3-panel workspace. Panel widths step up at 2xl (\u22651536px).
+          Below 2xl (e.g. 1280px laptops) we use narrower panels so the
+          center evaluation panel keeps enough breathing room. */}
       <div className="flex flex-1 min-h-0">
         {/* Left: Documents */}
-        <div className="w-[320px] panel-solid border-r border-white/[0.05] flex flex-col shrink-0">
+        <div className="w-[272px] 2xl:w-[320px] panel-solid border-r border-white/[0.05] flex flex-col shrink-0">
           <EmailList emails={emails} selectedId={selectedEmailId}
             onSelect={setSelectedEmailId} onUpdate={updateEmail}
             onDelete={deleteEmail} onAdd={addEmail}
@@ -129,7 +131,7 @@ export default function Demo() {
         </div>
 
         {/* Right: Analysis & Results */}
-        <div className="w-[480px] panel-solid border-l border-white/[0.05] flex flex-col shrink-0 overflow-hidden">
+        <div className="w-[400px] 2xl:w-[480px] panel-solid border-l border-white/[0.05] flex flex-col shrink-0 overflow-hidden">
           <ResultsPanel result={result} onShowTimelines={() => setShowTimelines(true)} />
         </div>
       </div>
