@@ -1,51 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRight, FileSearch, Brain, CheckCircle2, ChevronRight, Zap } from 'lucide-react';
 import { ProblemFigure, ExtractFigure, InterpretFigure, VerifyFigure } from '../components/landing/Illustrations';
 import { HeroScanGrid, SectionLabel, PipelineThread, StatBaseline } from '../components/landing/Premium';
-
-/* ── Animated stat counter ─────────────────────────────────────────────── */
-function AnimatedStat({ from, to, prefix = '', suffix = '', duration = 2000, label }) {
-  const ref = useRef(null);
-  const [started, setStarted] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setStarted(true); },
-      { threshold: 0.5 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!started || !ref.current) return;
-    const el = ref.current;
-    const startTime = performance.now();
-    function animate(now) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = from + (to - from) * eased;
-      if (suffix === 'M') el.textContent = `${prefix}${current.toFixed(1)}${suffix}`;
-      else if (suffix === '%') el.textContent = `${prefix}${Math.round(current)}${suffix}`;
-      else if (suffix === ' min') el.textContent = `${prefix}${Math.round(current)}${suffix}`;
-      else el.textContent = `${prefix}${current.toFixed(1)}${suffix}`;
-      if (progress < 1) requestAnimationFrame(animate);
-    }
-    requestAnimationFrame(animate);
-  }, [started, from, to, prefix, suffix, duration]);
-
-  return (
-    <div>
-      <div ref={ref} className="text-[40px] font-semibold text-white tracking-tight">
-        {prefix}{from}{suffix}
-      </div>
-      <StatBaseline active={started} duration={duration} />
-      <div className="text-[14px] text-slate-500 leading-relaxed">{label}</div>
-    </div>
-  );
-}
 
 /* ── Terminal mockup ───────────────────────────────────────────────────── */
 function TerminalDemo() {
@@ -179,35 +136,57 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ═══ Stats ═══ */}
+      {/* ═══ Why this matters — verifiable public record ═══ */}
       <section className="py-24 px-6 border-t border-white/[0.04]">
         <div className="max-w-[1080px] mx-auto">
-          <div className="max-w-[640px] mb-16">
-            <SectionLabel>The impact</SectionLabel>
+          <div className="max-w-[760px] mb-12">
+            <SectionLabel>Why this matters</SectionLabel>
             <h2 className="text-[32px] font-semibold text-white tracking-tight leading-[1.25]">
-              Less time reconciling.{' '}
+              The fee-tracking problem in private equity is{' '}
               <span className="text-slate-500">
-                More confidence in every capital call.
+                documented, expensive, and unsolved.
               </span>
             </h2>
           </div>
           <div className="grid grid-cols-3 gap-5">
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-              <AnimatedStat from={0} to={2.4} prefix="$" suffix="M" duration={2000}
-                label="Annual savings per business unit from fee errors caught" />
+              <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
+                $120M+
+              </div>
+              <StatBaseline active={true} duration={1200} />
+              <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
+                SEC fines on Blackstone, KKR, and Apollo (2015–2016) for fee-allocation
+                and expense-misallocation issues.
+              </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-              <AnimatedStat from={300} to={2} suffix=" min" duration={2500}
-                label="To verify a capital call, down from 4-6 hours" />
+              <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
+                CalPERS, 2015
+              </div>
+              <StatBaseline active={true} duration={1200} />
+              <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
+                Publicly admitted it could not calculate the carried interest it had
+                paid across its private-equity portfolio without external reconstruction.
+              </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-              <AnimatedStat from={0} to={85} suffix="%" duration={2000}
-                label="Fewer fee disputes with GPs" />
+              <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
+                Tens of bps
+              </div>
+              <StatBaseline active={true} duration={1200} />
+              <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
+                Documented fee dispersion between LPs in the same fund — often tens
+                of basis points, material on any meaningful commitment
+                (Begenau &amp; Siriwardane, 2022).
+              </div>
             </div>
           </div>
           <div className="mt-6">
-            <p className="text-[12px] text-slate-600 font-medium">
-              Based on EY PE Operations Survey, 2023
+            <p className="text-[12px] text-slate-600 leading-relaxed">
+              Sources: SEC press releases (2015–2016), CalPERS public disclosures,
+              Begenau &amp; Siriwardane (HBS Working Paper, 2022). The ILPA Fee
+              Reporting Template exists because tracking these terms is hard enough
+              to need industry-wide standardization.
             </p>
           </div>
         </div>
