@@ -304,6 +304,65 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ═══ Scope ═══ */}
+      <section className="py-24 px-6 border-t border-white/[0.04]">
+        <div className="max-w-[1080px] mx-auto">
+          <div className="max-w-[760px] mb-12">
+            <SectionLabel>Scope</SectionLabel>
+            <h2 className="text-[32px] font-semibold text-white tracking-tight leading-[1.25]">
+              What V1 covers.{' '}
+              <span className="text-slate-500">
+                And what was deliberately deferred.
+              </span>
+            </h2>
+            <p className="text-[14px] text-slate-500 leading-relaxed mt-5">
+              V1 is scoped around information an LP already has in their
+              document inbox: LPAs, side letters, amendments, election
+              forms, GP notices, capital account statements. Items in the
+              right column require data sources beyond documents
+              (portfolio-company ledgers, NAV feeds, distribution history)
+              and are tracked as V2.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+              <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-3">
+                Covered
+              </div>
+              <ul className="space-y-2 text-[13px] text-slate-400 leading-relaxed">
+                <li>• Automatic parsing of signed PDF documents (side letters, amendments, MFN forms)</li>
+                <li>• Base fee rate and basis; committed → invested switch at IP end</li>
+                <li>• Side letter overrides (CAP, FLOOR, step-downs)</li>
+                <li>• MFN election chains with GP confirmation</li>
+                <li>• Amendments to investment period, fund term, other dates</li>
+                <li>• Fee waivers with bounded effective periods</li>
+                <li>• Cross-clause dependencies via stability loop</li>
+                <li>• Compound date conditions (earlier-of, later-of, Boolean combinations over anniversaries, fiscal-quarter anchors, and fund metrics)</li>
+                <li>• Billing-period splitting at rate/basis transitions</li>
+                <li>• LP admission proration and catch-up fees for late-closers</li>
+                <li>• Ambiguous or unsupported clauses flagged for manual review, never silently ignored</li>
+                <li>• GP-claimed fee cross-checked against calculated fee with discrepancy delta</li>
+              </ul>
+            </div>
+            <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
+              <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-3">
+                Deferred to V2
+              </div>
+              <ul className="space-y-2 text-[13px] text-slate-400 leading-relaxed">
+                <li>• Transaction / monitoring fee offsets (needs portfolio-company fee ledger)</li>
+                <li>• Carried interest, waterfall, clawback (needs NAV + distribution ledger)</li>
+                <li>• Equalization at subsequent closings (needs commitment timing)</li>
+                <li>• NAV-adjusted invested-capital basis on write-downs</li>
+                <li>• Recallable distribution tracking</li>
+                <li>• Successor-fund step-down triggers (external event signal)</li>
+                <li>• Organizational expenses, placement fees, wind-down fees</li>
+                <li>• Cross-fund side letter inheritance</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ═══ CTA ═══ */}
       <section className="py-32 px-6 border-t border-white/[0.04]">
         <div className="max-w-[560px] mx-auto text-center">
