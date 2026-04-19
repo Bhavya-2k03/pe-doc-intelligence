@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Mail, Send, Upload, FileText, Trash2, Loader2, CheckCircle } from 'lucide-react';
+import { X, Mail, Send, Upload, FileText, Trash2, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { fileToBase64 } from '../../api';
 
 export default function EmailEditor({ email, onSave, onClose }) {
@@ -11,7 +11,19 @@ export default function EmailEditor({ email, onSave, onClose }) {
   const [attachments, setAttachments] = useState(email?.attachments || []);
   const [uploading, setUploading] = useState(false);
   const [justAdded, setJustAdded] = useState(null);
+  // `attempted` flips to true on first Save click; after that, empty-field
+  // errors render inline and block save until the user fills both fields.
+  const [attempted, setAttempted] = useState(false);
   const scrollRef = useRef(null);
+
+  const subjectError = attempted && !subject.trim() ? 'Subject is required' : null;
+  const bodyError = attempted && !body.trim() ? 'Body is required' : null;
+
+  const handleSave = () => {
+    setAttempted(true);
+    if (!subject.trim() || !body.trim()) return;
+    onSave({ subject, body, date: date + 'T00:00:00Z', direction, attachments });
+  };
 
   // Auto-scroll modal to bottom when a new attachment is added
   useEffect(() => {
@@ -77,7 +89,12 @@ export default function EmailEditor({ email, onSave, onClose }) {
           <div>
             <label className="block text-[9px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Subject</label>
             <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Document subject..."
-              className="bb-input w-full" />
+              className={`bb-input w-full ${subjectError ? 'border-red-500/50' : ''}`} />
+            {subjectError && (
+              <p className="mt-1 text-[11px] text-red-400 flex items-center gap-1">
+                <AlertCircle size={11} /> {subjectError}
+              </p>
+            )}
           </div>
 
           {/* Date */}
@@ -91,7 +108,13 @@ export default function EmailEditor({ email, onSave, onClose }) {
           <div>
             <label className="block text-[9px] font-bold text-slate-600 uppercase tracking-wider mb-1.5">Body</label>
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={5} placeholder="Email body..."
-              className="bb-input w-full h-auto py-2 resize-none leading-relaxed" style={{ height: 'auto' }} />
+              className={`bb-input w-full h-auto py-2 resize-none leading-relaxed ${bodyError ? 'border-red-500/50' : ''}`}
+              style={{ height: 'auto' }} />
+            {bodyError && (
+              <p className="mt-1 text-[11px] text-red-400 flex items-center gap-1">
+                <AlertCircle size={11} /> {bodyError}
+              </p>
+            )}
           </div>
 
           {/* LLM hint */}
@@ -140,8 +163,7 @@ export default function EmailEditor({ email, onSave, onClose }) {
         {/* Footer */}
         <div className="px-4 py-3 border-t border-white/[0.05] flex justify-end gap-2">
           <button onClick={onClose} className="bb-btn-ghost">Cancel</button>
-          <button onClick={() => onSave({ subject, body, date: date + 'T00:00:00Z', direction, attachments })}
-            className="bb-btn-primary">
+          <button onClick={handleSave} className="bb-btn-primary">
             {isNew ? 'Add' : 'Save'}
           </button>
         </div>
