@@ -332,7 +332,7 @@ export default function Landing() {
               <ul className="space-y-2 text-[13px] text-slate-400 leading-relaxed">
                 <li>• Automatic parsing of signed PDF documents (side letters, amendments, MFN forms)</li>
                 <li>• Base fee rate and basis; committed → invested switch at IP end</li>
-                <li>• Side letter overrides (CAP, FLOOR, step-downs)</li>
+                <li>• Side letter overrides on any fee term (rate, basis, caps, floors, step-downs)</li>
                 <li>• MFN election chains with GP confirmation</li>
                 <li>• Amendments to investment period, fund term, other dates</li>
                 <li>• Fee waivers with bounded effective periods</li>
