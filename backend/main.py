@@ -288,7 +288,13 @@ async def get_attachment(file_id: str):
     return Response(
         content=file_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename={file_id}.pdf"},
+        headers={
+            "Content-Disposition": f"inline; filename={file_id}.pdf",
+            # file_id is a UUID and the bytes never change for a given id,
+            # so cache aggressively. Browser serves repeats from disk cache,
+            # making subsequent AttachmentViewer opens effectively instant.
+            "Cache-Control": "public, max-age=31536000, immutable",
+        },
     )
 
 
