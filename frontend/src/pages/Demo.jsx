@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Monitor, ArrowLeft } from 'lucide-react';
 import { startSession, evaluate } from '../api';
 import StatusBar from '../components/shared/StatusBar';
 import TickerBar from '../components/shared/TickerBar';
@@ -11,8 +11,42 @@ import TimelineModal from '../components/timeline/TimelineModal';
 import PackageSelector from '../components/inbox/PackageSelector';
 import AttachmentViewer from '../components/inbox/AttachmentViewer';
 
+function MobileGate({ onBack }) {
+  return (
+    <div className="min-h-screen bg-[#06070b] flex flex-col items-center justify-center px-6 text-center">
+      <div className="max-w-[360px]">
+        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-5">
+          <Monitor size={20} className="text-cyan-400" />
+        </div>
+        <div className="text-[10px] font-bold text-cyan-400 uppercase tracking-[0.25em] mb-3">truefee</div>
+        <h1 className="text-[26px] font-semibold text-white tracking-tight mb-4 leading-tight">
+          Built for desktop
+        </h1>
+        <p className="text-[14px] text-slate-500 leading-relaxed mb-7">
+          The demo is a multi-panel workspace modeled on a Bloomberg terminal and needs more room than a phone screen.
+          Open <span className="text-slate-300 font-mono">truefee.io</span> on a laptop to try it.
+        </p>
+        <button onClick={onBack}
+          className="h-10 px-5 bg-white text-[#0a0a0f] text-[14px] font-medium rounded-md
+            hover:bg-slate-200 transition active:scale-[0.97] inline-flex items-center gap-2">
+          <ArrowLeft size={15} /> Read the overview
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Demo() {
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   const [sessionId, setSessionId] = useState(null);
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -73,6 +107,9 @@ export default function Demo() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [showTimelines]);
+
+  // ── Mobile gate ─────────────────────────────────────────────────
+  if (isMobile) return <MobileGate onBack={() => navigate('/')} />;
 
   // ── Error state ─────────────────────────────────────────────────
   if (error) return (

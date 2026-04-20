@@ -78,7 +78,7 @@ export default function Landing() {
         <div className="relative max-w-[1080px] mx-auto flex gap-16 items-start">
           {/* Left: headline + copy */}
           <div className="flex-1 max-w-[560px]">
-            <h1 className="fade-up text-[52px] md:text-[64px] font-semibold tracking-[-0.035em] leading-[1.05]">
+            <h1 className="fade-up text-[36px] sm:text-[44px] md:text-[52px] lg:text-[64px] font-semibold tracking-[-0.035em] leading-[1.05]">
               Every side letter read.
               <br />
               <span className="text-slate-500">Every fee verified.</span>
@@ -148,7 +148,7 @@ export default function Landing() {
               </span>
             </h2>
           </div>
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
               <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
                 $120M+
@@ -206,8 +206,10 @@ export default function Landing() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-3 gap-5 relative">
-            <PipelineThread />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 relative">
+            <div className="hidden md:contents">
+              <PipelineThread />
+            </div>
             {[
               {
                 icon: FileSearch, num: '01', title: 'Extract',
@@ -259,7 +261,7 @@ export default function Landing() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-2 auto-rows-fr gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 auto-rows-fr gap-5">
             {[
               {
                 title: 'Side letter fee terms',
