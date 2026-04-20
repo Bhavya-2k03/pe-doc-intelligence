@@ -44,7 +44,7 @@ Five layers, each with one job:
 4. **Confirm.** Multi-document flows (GP disclosure → LP election → GP confirmation) are matched by intent type and reference date. Unconfirmed clauses don't execute.
 5. **Execute.** Clauses run in document order to build per-field timelines; stability loop resolves cross-clause dependencies.
 
-A fee calculator then splits the billing period at every rate or basis transition, resolves the basis amount (committed, invested, unfunded, with LP pro-rata fallback), and returns a sub-period breakdown with source-clause references.
+A fee calculator then splits the billing period at every rate or basis transition, resolves the basis amount (committed, invested, unfunded, with LP pro-rata fallback), and returns a sub-period breakdown of the management fee.
 
 ## Stack
 
