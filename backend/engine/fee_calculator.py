@@ -433,7 +433,16 @@ def compute_management_fee(
             anchor = val if isinstance(val, date) else date.fromisoformat(str(val))
 
     if anchor is None:
-        assumptions.append("fund_initial_closing_date not found in timelines")
+        # Two paths here: (1) the field is absent from timelines (malformed seed),
+        # or (2) the field exists but value_at returned None, which can only mean
+        # evaluation_date precedes the seed entry — i.e. the fund is not yet operational.
+        if anchor_tl is None:
+            assumptions.append("fund_initial_closing_date not found in timelines")
+        else:
+            assumptions.append(
+                f"Evaluation date ({evaluation_date}) is before the fund's initial closing. "
+                f"The fund is not yet operational and no management fee accrues."
+            )
         return FeeResult(
             billing_period_start=evaluation_date,
             billing_period_end=evaluation_date,
@@ -460,6 +469,34 @@ def compute_management_fee(
             assumptions.append("Billing cadence not set — defaulting to quarterly")
     else:
         assumptions.append("Billing cadence not set — defaulting to quarterly")
+
+    # ── Guard: evaluation_date at or after fund's term end ────────────
+    # Fund life is over; no management fee accrues post-termination (V1).
+    term_tl = timelines.get("fund_term_end_date")
+    if term_tl is not None:
+        val = term_tl.value_at(evaluation_date)
+        if val is not None:
+            term_end = val if isinstance(val, date) else date.fromisoformat(str(val))
+            if evaluation_date >= term_end:
+                assumptions.append(
+                    f"Evaluation date ({evaluation_date}) is on or after the fund's term end "
+                    f"({term_end}). The fund has terminated and no management fee accrues."
+                )
+                return FeeResult(
+                    billing_period_start=term_end,
+                    billing_period_end=term_end,
+                    billing_cadence=cadence,
+                    anchor_date=anchor,
+                    current_period_fee=BillingPeriodFee(
+                        period_start=term_end, period_end=term_end,
+                        total_fee=0.0, sub_periods=[],
+                    ),
+                    catchup_fee=None,
+                    catchup_period_start=None,
+                    catchup_period_end=None,
+                    lp_admission_date=lp_admission_date or anchor,
+                    assumptions=assumptions,
+                )
 
     # ── Validate and default lp_admission_date ────────────────────────
     final_closing: date | None = None

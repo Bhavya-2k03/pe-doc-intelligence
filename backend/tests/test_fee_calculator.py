@@ -376,8 +376,21 @@ class TestEdgeCases:
         timelines = _build_base_timelines()
         result = compute_management_fee(timelines, date(2023, 6, 1))
         assert result.current_period_fee.total_fee == 0.0
-        # value_at returns None for dates before seed → hits "not found" path
-        assert any("fund_initial_closing_date" in a for a in result.assumptions)
+        # value_at returns None for dates before the seed entry, which means
+        # evaluation_date precedes the fund's initial closing.
+        assert any("before the fund's initial closing" in a for a in result.assumptions)
+
+    def test_eval_date_after_term_end_returns_zero(self):
+        """Evaluation date on or after fund term end → fund has terminated, zero fee."""
+        timelines = _build_base_timelines()
+        timelines["fund_term_end_date"] = FieldTimeline()
+        timelines["fund_term_end_date"].insert_entry(TimelineEntry(
+            date=date(2024, 1, 15), value="2034-01-15",
+            source_clause_text="LPA", entry_type="SET",
+        ))
+        result = compute_management_fee(timelines, date(2034, 6, 1))
+        assert result.current_period_fee.total_fee == 0.0
+        assert any("terminated" in a for a in result.assumptions)
 
     def test_invested_capital_pro_rata(self):
         """LP with 25% of fund → invested_capital basis uses pro-rata share.
