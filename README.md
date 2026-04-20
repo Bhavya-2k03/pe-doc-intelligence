@@ -1,6 +1,8 @@
 # truefee
 
-A system that reads the paperwork behind a private-equity fund (side letters, amendments, MFN forms, capital account statements) and independently verifies the GP's management-fee calculation against what those documents actually say.
+A reasoning engine on the governing language of a private-equity fund. It reads LPAs, side letters, amendments, and MFN election packages, interprets each clause into an executable rule, resolves cross-clause dependencies via a stability loop, and independently recomputes the management fee to compare against what the GP billed.
+
+Upstream of Aladdin and eFront, which run on structured inputs a human has already interpreted out of the documents. truefee is that interpretation layer, automated.
 
 Live demo: **[truefee.io](https://truefee.io)**
 
@@ -12,7 +14,7 @@ Limited partners in PE funds routinely overpay management fees. The reason isn't
 
 This isn't a niche problem:
 
-- The SEC fined Blackstone, KKR, and Apollo a combined ~$120M for fee-allocation issues in 2015–2016.
+- The SEC fined Blackstone, KKR, and Apollo a combined ~$120M for fee-allocation issues in 2015 and 2016.
 - CalPERS admitted publicly in 2015 it couldn't calculate the carried interest it had paid across its PE portfolio without external reconstruction.
 - Begenau & Siriwardane (HBS Working Paper, 2022) documented tens of basis points of fee dispersion between LPs in the same fund.
 
@@ -36,13 +38,13 @@ Most implementations of this flavor of problem skip the dependency or hardcode a
 
 Five layers, each with one job:
 
-1. **Extract** — LlamaParse reads signed PDFs; an LLM pulls structured clauses, fields, and document intent from each source.
-2. **Interpret** — every clause becomes a typed AST against a field registry (`management_fee_rate`, `fund_investment_end_date`, etc.).
-3. **Resolve dates** — ambiguous and conditional effective dates ("the earlier of the 2nd anniversary of final closing or 50% fund realization") are resolved against current timelines.
-4. **Confirm** — multi-document flows (GP disclosure → LP election → GP confirmation) are matched by intent type and reference date. Unconfirmed clauses don't execute.
-5. **Execute** — clauses run in document order to build per-field timelines; stability loop resolves cross-clause dependencies.
+1. **Extract.** LlamaParse reads signed PDFs; an LLM pulls structured clauses, fields, and document intent from each source.
+2. **Interpret.** Every clause becomes a typed AST against a field registry (`management_fee_rate`, `fund_investment_end_date`, etc.).
+3. **Resolve dates.** Ambiguous and conditional effective dates ("the earlier of the 2nd anniversary of final closing or 50% fund realization") are resolved against current timelines.
+4. **Confirm.** Multi-document flows (GP disclosure → LP election → GP confirmation) are matched by intent type and reference date. Unconfirmed clauses don't execute.
+5. **Execute.** Clauses run in document order to build per-field timelines; stability loop resolves cross-clause dependencies.
 
-A fee calculator then splits the billing period at every rate or basis transition, resolves the basis amount (committed, invested, unfunded — with LP pro-rata fallback), and returns a sub-period breakdown with source-clause references.
+A fee calculator then splits the billing period at every rate or basis transition, resolves the basis amount (committed, invested, unfunded, with LP pro-rata fallback), and returns a sub-period breakdown with source-clause references.
 
 ## Stack
 
@@ -130,7 +132,7 @@ Cloudflare proxy (orange cloud) on the backend subdomain will buffer SSE respons
 cd backend && pytest
 ```
 
-256 passing, 11 skipped. The skipped cases exercise a legacy graceful-None pattern in the AST evaluator that was removed in favor of raising `MissingFieldValueError` — raising surfaces cleaner user-facing error messages from the UI when a clause references a field that no email has reported yet.
+256 passing, 11 skipped. The skipped cases exercise a legacy graceful-None pattern in the AST evaluator that was removed in favor of raising `MissingFieldValueError`. Raising surfaces cleaner user-facing error messages from the UI when a clause references a field that no email has reported yet.
 
 ---
 
