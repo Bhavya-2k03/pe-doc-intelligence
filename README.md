@@ -136,4 +136,4 @@ cd backend && pytest
 
 ---
 
-Built by [Bhavya Gupta](https://github.com/Bhavya-2k03). Feedback or questions: open an issue, or reach me on LinkedIn.
+Built by [Bhavya Gupta](https://github.com/Bhavya-2k03). Feedback or questions: open an issue, or reach me on LinkedIn or bhavya.2k03@gmail.com
