@@ -138,11 +138,12 @@ const SCENARIO_INFO = {
   },
   side_letter_flow: {
     title: 'Side Letter with Conditional Fee Reduction',
-    description: 'A side letter defers the post-IP fee reduction until the earlier of (a) the 2nd anniversary of final closing or (b) the fund reaching 50% realization. Subsequent fund realization reports arrive in later emails as the fund matures.',
+    description: 'A side letter defers the post-investment-period fee reduction until the earlier of (a) the 8th anniversary of final closing or (b) the fund reaching 50% realization. Both conditions resolve after IP end, so the engine holds the rate until one fires.',
     lookFor: [
-      'Compound "earlier-of" condition mixing one fixed date and one dynamic fund metric. The engine resolves both and applies whichever fires first.',
-      '(a) resolves to 2026-12-15 (2024-12-15 final closing + 2 years). (b) resolves to 2027-12-31 when Q4 2027 realization hits 62%. (a) wins by 12 months.',
-      'Try evaluation date 2026-12-15 (when condition (a) fires) to watch the engine resolve the compound condition.',
+      'Compound "earlier-of" condition mixing a fixed post-IP-end date and a dynamic fund metric. The engine resolves both and applies whichever fires first.',
+      '(a) resolves to 2032-12-15 (2024-12-15 final closing + 8 years). (b) resolves to 2030-12-31 when Q4 2030 realization hits 62%. (b) wins by about two years.',
+      'At IP end (2029-01-15), the LPA baseline would drop the rate from 2% to 1.5%. The side letter gates that reduction behind (a) or (b); neither has fired yet, so the engine correctly holds the rate at 2%.',
+      'Try evaluation date 2029-06-01 (5 months past IP end, gate still closed, rate stays at 2%) and compare with 2031-02-01 (after (b) fires, gate opens, rate drops to 1.5%).',
     ],
   },
   multi_amendment: {
