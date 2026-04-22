@@ -142,7 +142,7 @@ const SCENARIO_INFO = {
     lookFor: [
       'Compound "earlier-of" condition mixing one fixed date and one dynamic fund metric. The engine resolves both and applies whichever fires first.',
       '(a) resolves to 2026-12-15 (2024-12-15 final closing + 2 years). (b) resolves to 2027-12-31 when Q4 2027 realization hits 62%. (a) wins by 12 months.',
-      'Suggested evaluation dates: 2026-11-30 (before either condition has fired) and 2026-12-15 (the date condition (a) fires). Compare the fee breakdown and timeline between the two to see the engine apply the resolved effective date.',
+      'Try evaluation date 2026-12-15 (when condition (a) fires) to watch the engine resolve the compound condition.',
     ],
   },
   multi_amendment: {
