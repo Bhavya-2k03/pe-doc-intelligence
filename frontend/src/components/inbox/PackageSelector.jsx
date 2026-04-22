@@ -6,7 +6,7 @@ const PACKAGES = [
     title: 'MFN Election Chain',
     icon: Link2,
     emails: 4,
-    description: 'GP disclosure, LP election, GP confirmation. A full confirmation chain with fee impact and GATE deferral.',
+    description: 'GP disclosure, LP election, GP confirmation. A full confirmation chain that updates fee terms once the election effective date is reached.',
   },
   {
     id: 'side_letter_flow',

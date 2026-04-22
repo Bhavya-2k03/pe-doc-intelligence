@@ -130,19 +130,19 @@ const SCENARIO_INFO = {
     title: 'MFN Election Chain',
     description: 'This inbox contains emails forming a Most Favored Nation election flow: GP disclosure, LP election, and GP confirmation.',
     lookFor: [
-      'Elected terms only execute when the evaluation date is after the GP confirmation. Unconfirmed clauses are excluded.',
+      'Elected terms only execute when the evaluation date is on or after the effective date specified in the GP confirmation, not the date the confirmation was sent.',
       'The CONFIRM stage in the terminal resolves the 3-document chain',
-      'Fee timeline shifts from LPA baseline to elected terms once confirmed',
-      'Try setting the evaluation date before the confirmation email to see clauses remain unexecuted',
+      'Fee timeline shifts from LPA baseline to elected terms once the effective date is reached',
+      'Try setting the evaluation date before the effective date referenced in the GP confirmation to see elected terms remain unexecuted',
     ],
   },
-  side_letter: {
-    title: 'Side Letter Amendment',
-    description: 'This inbox contains a side letter with fee reduction and billing cadence change.',
+  side_letter_flow: {
+    title: 'Side Letter with Conditional Fee Reduction',
+    description: 'A side letter defers the post-IP fee reduction until the earlier of (a) the 2nd anniversary of final closing or (b) the fund reaching 50% realization. Subsequent fund realization reports arrive in later emails as the fund matures.',
     lookFor: [
-      'Clause extraction from the side letter document',
-      'Timeline shows the fee rate override from the side letter',
-      'Billing cadence change reflected in the fee calculation period',
+      'Compound "earlier-of" condition mixing one fixed date and one dynamic fund metric. The engine resolves both and applies whichever fires first.',
+      '(a) resolves to 2026-12-15 (2024-12-15 final closing + 2 years). (b) resolves to 2027-12-31 when Q4 2027 realization hits 62%. (a) wins by 12 months.',
+      'Suggested evaluation dates: 2026-11-30 (before either condition has fired) and 2026-12-15 (the date condition (a) fires). Compare the fee breakdown and timeline between the two to see the engine apply the resolved effective date.',
     ],
   },
   multi_amendment: {
@@ -310,8 +310,8 @@ export default function EvalPanel({ onEvaluate, evaluating, result, progressLog,
         </div>
       </form>
 
-      {/* Scenario context card — shown when a package is selected, no result yet, and user hasn't edited emails */}
-      {selectedPackage && !result && !evaluating && !emailsModified && (
+      {/* Scenario context card — shown while the inbox matches the seed scenario */}
+      {selectedPackage && !emailsModified && (
         <ScenarioCard packageId={selectedPackage} />
       )}
 
