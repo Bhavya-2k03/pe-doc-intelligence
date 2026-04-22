@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Info, AlertTriangle, FileQuestion, BarChart3, Maximize2, Shield } from 'lucide-react';
 import FeeVerdict from '../evaluation/FeeVerdict';
 import FeeBreakdown from '../evaluation/FeeBreakdown';
@@ -27,6 +27,18 @@ function CollapsibleSection({ title, icon: Icon, color, count, defaultOpen = tru
 }
 
 export default function ResultsPanel({ result, onShowTimelines }) {
+  // Pulse the Fullscreen Timelines button for a few seconds after a
+  // result arrives — draws reviewer's eye to the in-app timeline view
+  // so they don't miss it when scenario card + fee breakdown fill the
+  // visible area.
+  const [pulseTimelines, setPulseTimelines] = useState(false);
+  useEffect(() => {
+    if (!result) return;
+    setPulseTimelines(true);
+    const t = setTimeout(() => setPulseTimelines(false), 4000);
+    return () => clearTimeout(t);
+  }, [result]);
+
   if (!result) {
     return (
       <div className="h-full flex flex-col items-center justify-center px-6 text-center">
@@ -52,7 +64,11 @@ export default function ResultsPanel({ result, onShowTimelines }) {
 
         {/* View Timelines button */}
         <button onClick={onShowTimelines}
-          className="w-full bb-btn-ghost justify-center gap-2">
+          className={`w-full bb-btn-ghost justify-center gap-2 transition-all ${
+            pulseTimelines
+              ? 'ring-2 ring-cyan-500/60 animate-pulse shadow-[0_0_16px_rgba(34,211,238,0.35)]'
+              : ''
+          }`}>
           <Maximize2 size={12} className="text-cyan-500" />
           <span>Fullscreen Timelines</span>
         </button>

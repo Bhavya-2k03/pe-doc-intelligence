@@ -316,22 +316,26 @@ export default function EvalPanel({ onEvaluate, evaluating, result, progressLog,
         <ScenarioCard packageId={selectedPackage} />
       )}
 
+      {/* Inline timelines — appear after evaluation. Rendered above
+          the Terminal post-eval so reviewers hit the substantive
+          result first; Terminal (the progress log) drops below. */}
+      {result?.timelines && (
+        <div className="mt-3">
+          <InlineTimelines timelines={result.timelines} constraints={result.constraints}
+            fundTermEndDate={result.fund_term_end_date} />
+        </div>
+      )}
+
       {/* Terminal */}
-      <Terminal log={progressLog} active={evaluating} />
+      <div className={result?.timelines ? 'mt-3' : ''}>
+        <Terminal log={progressLog} active={evaluating} />
+      </div>
 
       {/* Evaluation error — inline */}
       {evalError && (
         <div className="mt-3 rounded border border-red-500/20 bg-red-500/[0.05] px-4 py-3">
           <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Pipeline Error</div>
           <div className="text-[12px] text-red-300/80 font-mono leading-relaxed">{evalError}</div>
-        </div>
-      )}
-
-      {/* Inline timelines — appear after evaluation */}
-      {result?.timelines && (
-        <div className="mt-3">
-          <InlineTimelines timelines={result.timelines} constraints={result.constraints}
-            fundTermEndDate={result.fund_term_end_date} />
         </div>
       )}
 
