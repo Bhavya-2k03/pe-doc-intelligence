@@ -1,6 +1,6 @@
 # truefee
 
-A reasoning engine on the governing language of a private-equity fund. It reads LPAs, side letters, amendments, and MFN election packages, interprets each clause into an executable rule, resolves cross-clause dependencies via a stability loop, and independently recomputes the management fee to compare against what the GP billed.
+A reasoning engine for private-equity management fee verification. It takes the LPA's fee terms as a baseline fund-parameter timeline, then interprets the documents that modify that baseline (side letters, amendments, MFN election packages, capital account statements, fund realization reports) as executable rules, resolves cross-clause dependencies via a stability loop, and independently recomputes the management fee to compare against what the GP billed.
 
 Upstream of Aladdin and eFront, which run on structured inputs a human has already interpreted out of the documents. truefee is that interpretation layer, automated.
 
@@ -38,7 +38,7 @@ Most implementations of this flavor of problem skip the dependency or hardcode a
 
 Five layers, each with one job:
 
-1. **Extract.** LlamaParse reads signed PDFs; an LLM pulls structured clauses, fields, and document intent from each source.
+1. **Extract.** LlamaParse reads the modifying-document PDFs (side letters, amendments, MFN forms, capital account statements, realization reports); an LLM pulls structured clauses, fields, and document intent from each source. The LPA itself is not parsed; its fee terms are entered once as baseline timeline values.
 2. **Interpret.** Every clause becomes a typed AST against a field registry (`management_fee_rate`, `fund_investment_end_date`, etc.).
 3. **Resolve dates.** Ambiguous and conditional effective dates ("the earlier of the 2nd anniversary of final closing or 50% fund realization") are resolved against current timelines.
 4. **Confirm.** Multi-document flows (GP disclosure → LP election → GP confirmation) are matched by intent type and reference date. Unconfirmed clauses don't execute.
