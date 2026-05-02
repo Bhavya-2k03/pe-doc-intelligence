@@ -79,9 +79,9 @@ export default function Landing() {
           {/* Left: headline + copy */}
           <div className="flex-1 max-w-[560px]">
             <h1 className="fade-up text-[36px] sm:text-[44px] md:text-[52px] lg:text-[64px] font-semibold tracking-[-0.035em] leading-[1.05]">
-              Every clause, interpreted.
+              Every clause interpreted.
               <br />
-              <span className="text-slate-500">Every fee, independently verified.</span>
+              <span className="text-slate-500">Every fee verified.</span>
             </h1>
             <p className="fade-up fade-up-delay-1 mt-6 text-[17px] text-slate-400 leading-relaxed max-w-[480px]">
               Your operations team spends hours piecing together side letters, MFN elections,
