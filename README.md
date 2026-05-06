@@ -111,7 +111,7 @@ backend/
   constants.py      field registry
   engine/           pipeline, extractor, clause interpreter, timeline engine, fee calculator
   scripts/          dev-only: migrate, push packages, demo
-  tests/            256+ unit tests
+  tests/            246 unit tests
 frontend/
   src/components/   inbox, evaluation, timeline, shared
   src/pages/        Landing, Demo
@@ -132,7 +132,7 @@ Cloudflare proxy (orange cloud) on the backend subdomain will buffer SSE respons
 cd backend && pytest
 ```
 
-256 passing, 11 skipped. The skipped cases exercise a legacy graceful-None pattern in the AST evaluator that was removed in favor of raising `MissingFieldValueError`. Raising surfaces cleaner user-facing error messages from the UI when a clause references a field that no email has reported yet.
+246 unit tests passing, 11 skipped. The skipped cases exercise a legacy graceful-None pattern in the AST evaluator that was removed in favor of raising `MissingFieldValueError`. 
 
 ---
 
