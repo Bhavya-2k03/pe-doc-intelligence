@@ -144,7 +144,7 @@ export default function Landing() {
             <h2 className="text-[32px] font-semibold text-white tracking-tight leading-[1.25]">
               The fee-tracking problem in private equity is{' '}
               <span className="text-slate-500">
-                documented, expensive, and unsolved.
+                documented, expensive, and labor-intensive.
               </span>
             </h2>
           </div>
@@ -155,18 +155,18 @@ export default function Landing() {
               </div>
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
-                SEC fines on Blackstone, KKR, and Apollo (2015–2016) for fee-allocation
-                and expense-misallocation issues.
+                SEC fines on Blackstone, KKR, and Apollo (2015–2016) for
+                fee-disclosure issues, including side-letter MFN non-compliance.
               </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
               <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
-                CalPERS, 2015
+                ILPA Template
               </div>
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
-                Publicly admitted it could not calculate the carried interest it had
-                paid across its private-equity portfolio without external reconstruction.
+                Industry-wide standard for management fee reporting, adopted
+                because no two GPs report management fees the same way without it.
               </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
@@ -183,10 +183,9 @@ export default function Landing() {
           </div>
           <div className="mt-6">
             <p className="text-[12px] text-slate-600 leading-relaxed">
-              Sources: SEC press releases (2015–2016), CalPERS public disclosures,
-              Begenau &amp; Siriwardane (HBS Working Paper, 2022). The ILPA Fee
-              Reporting Template exists because tracking these terms is hard enough
-              to need industry-wide standardization.
+              Sources: SEC press releases (2015–2016), ILPA Fee Reporting
+              Template (Institutional Limited Partners Association), Begenau
+              &amp; Siriwardane (HBS Working Paper, 2022).
             </p>
           </div>
         </div>
@@ -292,8 +291,8 @@ export default function Landing() {
                 desc: 'See how the fee rate, basis, and cadence evolve across the entire fund life. Every amendment, constraint, and transition visualized on a single timeline.',
               },
               {
-                title: 'Complements your existing systems',
-                desc: 'Aladdin, Geneva, and eFront handle structured data. This system handles the unstructured documents they were never designed to process.',
+                title: 'Cross-clause dependency resolution',
+                desc: 'When a later amendment changes a fund parameter (like extending the Investment Period), every earlier clause anchored to that parameter is re-evaluated. Catches the cumulative effects a sequential human reader would miss.',
               },
             ].map(({ title, desc }, i) => (
               <div key={i} className="group px-6 py-5 rounded-lg bg-white/[0.02] border border-white/[0.04]
