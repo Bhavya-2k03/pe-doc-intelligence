@@ -151,12 +151,13 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
               <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
-                $120M+
+                Shadow accounting
               </div>
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
-                SEC fines on Blackstone, KKR, and Apollo (2015–2016) for
-                fee-disclosure issues, including side-letter MFN non-compliance.
+                Large LPs like GIC and CPPIB run dedicated teams that
+                independently re-compute every GP's fee bill against the LPA
+                and side letters. The work is real; today, it's done by hand.
               </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
@@ -165,8 +166,9 @@ export default function Landing() {
               </div>
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
-                Industry-wide standard for management fee reporting, adopted
-                because no two GPs report management fees the same way without it.
+                Industry-wide standard for how GPs <em>report</em> management
+                fees. It standardized the format — not whether the underlying
+                number is correct. Verification is still the LP's job.
               </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
@@ -183,9 +185,10 @@ export default function Landing() {
           </div>
           <div className="mt-6">
             <p className="text-[12px] text-slate-600 leading-relaxed">
-              Sources: SEC press releases (2015–2016), ILPA Fee Reporting
-              Template (Institutional Limited Partners Association), Begenau
-              &amp; Siriwardane (HBS Working Paper, 2022).
+              Sources: ILPA Fee Reporting Template (Institutional Limited
+              Partners Association); Begenau &amp; Siriwardane (HBS Working
+              Paper, 2022); shadow-accounting practice at large institutional
+              LPs (GIC, CPPIB, and others).
             </p>
           </div>
         </div>
