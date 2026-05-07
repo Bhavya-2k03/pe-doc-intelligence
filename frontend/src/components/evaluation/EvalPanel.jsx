@@ -148,7 +148,7 @@ const SCENARIO_INFO = {
   },
   multi_amendment: {
     title: 'Multi-Amendment Scenario',
-    description: 'Three documents issued years apart: a fee cap side letter, a mid-life GP fee accommodation tied to the Investment Period end, and a later Investment Period extension. The extension silently stretches the waiver window, worth material additional savings a human reader could easily miss.',
+    description: 'Documents issued years apart: a fee cap side letter, a mid-life GP fee accommodation tied to the Investment Period end, and a later Investment Period extension. The extension silently stretches the waiver window, worth material additional savings a human reader could easily miss.',
     lookFor: [
       'Fee timeline shows three phases: 2% baseline, 1% waiver, capped post-IP rate',
       'Stability loop re-evaluates the waiver end date once the IP extension executes',
@@ -189,11 +189,11 @@ function InfoCards() {
           the billing period containing your evaluation date. Enter the GP's claimed fee
           to verify if it matches.
         </p>
-        <p className="text-[12px] text-slate-400 leading-relaxed mt-2.5">
+        {/* <p className="text-[12px] text-slate-400 leading-relaxed mt-2.5">
           Designed to work alongside portfolio management systems (Aladdin, Geneva, eFront) that handle
           structured data like cash flows and capital accounts. This system handles the unstructured
           side: interpreting legal documents that those systems can't process.
-        </p>
+        </p> */}
       </div>
 
       <div className="rounded border border-white/[0.05] bg-white/[0.01] px-4 py-3">
