@@ -92,12 +92,12 @@ Want full pipeline traces on every evaluate? Set `DEBUG_TRACE=1` in `.env` and c
 **V2 (deferred because they require data beyond the document inbox):**
 
 - Transaction / monitoring fee offsets (needs portfolio-company fee ledger)
-- Carried interest, waterfall, clawback (needs NAV + distribution ledger)
+<!-- - Carried interest, waterfall, clawback (needs NAV + distribution ledger) -->
 - Equalization at subsequent closings
 - NAV-adjusted invested-capital basis on write-downs
-- Recallable distribution tracking
-- Successor-fund step-down triggers (external event signal)
-- Organizational, placement, and wind-down fees
+<!-- - Recallable distribution tracking -->
+<!-- - Successor-fund step-down triggers (external event signal) -->
+<!-- - Organizational, placement, and wind-down fees -->
 - Cross-fund side letter inheritance
 
 ## Layout
