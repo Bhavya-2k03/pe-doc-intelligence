@@ -151,13 +151,13 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
               <div className="text-[36px] font-semibold text-cyan-400 font-mono tracking-tight">
-                Shadow accounting
+                Done by hand
               </div>
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
-                Large LPs like GIC and CPPIB run dedicated teams that
-                independently re-compute every GP's fee bill against the LPA
-                and side letters. The work is real; today, it's done by hand.
+                Large LPs like GIC and CPPIB run dedicated shadow-accounting
+                teams that independently re-compute every GP's fee bill
+                against the LPA and side letters. Today, the work is manual.
               </div>
             </div>
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
