@@ -729,6 +729,8 @@ source_effective_date_condition:
     → condition: "second anniversary of Fund's Final Closing"
     "Effective from the next billing period, the following amendments apply: ..."
     → condition: "next billing period"
+    "The following clauses will only be valid when fund realisation percentage is greater than 50%: 1. ... 2. ..."
+    → condition: "fund realisation percentage greater than 50%"
 
   Examples of NULL (clause-level timing — handled by clause interpreter, NOT here):
     "Starting from next year, billing cadence will be annual." → null
@@ -812,6 +814,94 @@ Key points from this example:
 - Both clauses get source_effective_date_condition = "next fiscal quarter" (inherited from preamble).
 - source_effective_date is null (not an explicit calendar date).
 - "until fund realisation percentage hits 50%" stays in clause_text — it's a clause-level condition that the clause interpreter will handle, NOT a source_effective_date_condition.
+
+---
+
+## Worked Example 2 — Preamble with metric contingency
+
+Input email body:
+```
+The following clauses will only be valid when fund realisation percentage is greater than 43%:
+1. Fee for September 2027 is waived.
+2. Fee basis will shift to invested capital.
+```
+
+Analysis:
+- The email has a preamble ("The following clauses will only be valid when fund
+  realisation percentage is greater than 43%:") followed by a numbered list.
+  This is NOT a single clause — it's a preamble + list.
+- Standalone test (Clause Boundary Rule 1): each numbered item is a complete
+  rule — "Fee for September 2027 is waived" and "Fee basis will shift to
+  invested capital" are both standalone rules. → Extract each as a SEPARATE
+  clause.
+- The preamble's timing language is "valid when fund realisation percentage
+  is greater than 43%". This is a CONTINGENT TRIGGER (rule (b) — fund-metric
+  threshold is the same shape as "upon Key Person Event", just expressed as
+  a numeric threshold rather than a discrete event). → STEP 2 →
+  source_effective_date_condition.
+- Both clauses inherit this preamble condition.
+
+Output:
+```json
+{
+  "extracted_fields": null,
+  "clauses": [
+    {
+      "clause_text": "Fee for September 2027 is waived.",
+      "doc_type": "email",
+      "source_signed_date": "<email date>",
+      "source_effective_date": null,
+      "source_effective_date_condition": "fund realisation percentage greater than 43%",
+      "source_context": "The following clauses will only be valid when fund realisation percentage is greater than 43%:",
+      "email_source_id": "<email id>",
+      "attachment_index": null
+    },
+    {
+      "clause_text": "Fee basis will shift to invested capital.",
+      "doc_type": "email",
+      "source_signed_date": "<email date>",
+      "source_effective_date": null,
+      "source_effective_date_condition": "fund realisation percentage greater than 43%",
+      "source_context": "The following clauses will only be valid when fund realisation percentage is greater than 43%:",
+      "email_source_id": "<email id>",
+      "attachment_index": null
+    }
+  ],
+  "document_intent": [
+    {
+      "attachment_name": null,
+      "attachment_index": null,
+      "intent_type": "amendment",
+      "binding_status": "supersedes_prior",
+      "confirmation_required": false,
+      "references": {
+        "document_type": "limited_partnership_agreement",
+        "reference_date": null,
+        "reference_signals": "LPA amendment",
+        "confirmed_effective_date": null,
+        "confirmed_effective_date_condition": "fund realisation percentage greater than 43%"
+      },
+      "resolutions": null,
+      "lp_identifier": null,
+      "gp_identifier": null
+    }
+  ]
+}
+```
+
+Key points from this example:
+- Same preamble + numbered list shape as Example 1; only the trigger TYPE
+  differs (date-relative there, fund-metric here).
+- Both clauses inherit the SAME source_effective_date_condition from the
+  preamble. The exact phrase from the preamble is captured verbatim.
+- This is the contingent-trigger case (rule (b)) — the engine resolves it
+  later via the boolean output type from the date-condition LLM call, then
+  scans timeline entries to find the earliest date the metric crossed the
+  threshold.
+- Important contrast: a clause whose own text contains a metric condition
+  (e.g., "the deferred reduction shall apply once realisation hits 50%") is
+  STILL clause-level timing and stays in clause_text. The distinction is
+  preamble vs in-clause, not date vs metric.
 
 ---
 
