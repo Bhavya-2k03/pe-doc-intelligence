@@ -2,8 +2,6 @@
 
 A reasoning engine for private-equity management fee verification. It takes the LPA's fee terms as a baseline fund-parameter timeline, then interprets the documents that modify that baseline (side letters, amendments, MFN election packages, capital account statements, fund realization reports) as executable rules, resolves cross-clause dependencies via a stability loop, and independently recomputes the management fee to compare against what the GP billed.
 
-Upstream of Aladdin and eFront, which run on structured inputs a human has already interpreted out of the documents. truefee is that interpretation layer, automated.
-
 Live demo: **[truefee.io](https://truefee.io)**
 
 ---
