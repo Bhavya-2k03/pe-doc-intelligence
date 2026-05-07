@@ -351,12 +351,12 @@ export default function Landing() {
               </div>
               <ul className="space-y-2 text-[13px] text-slate-400 leading-relaxed">
                 <li>• Transaction / monitoring fee offsets (needs portfolio-company fee ledger)</li>
-                <li>• Carried interest, waterfall, clawback (needs NAV + distribution ledger)</li>
+                {/* <li>• Carried interest, waterfall, clawback (needs NAV + distribution ledger)</li> */}
                 <li>• Equalization at subsequent closings (needs commitment timing)</li>
                 <li>• NAV-adjusted invested-capital basis on write-downs</li>
-                <li>• Recallable distribution tracking</li>
-                <li>• Successor-fund step-down triggers (external event signal)</li>
-                <li>• Organizational expenses, placement fees, wind-down fees</li>
+                {/* <li>• Recallable distribution tracking</li> */}
+                {/* <li>• Successor-fund step-down triggers (external event signal)</li> */}
+                {/* <li>• Organizational expenses, placement fees, wind-down fees</li> */}
                 <li>• Cross-fund side letter inheritance</li>
               </ul>
             </div>
