@@ -2620,6 +2620,72 @@ Reasoning:
 ]
 ```
 
+### Example 10b: SET with literal start date and field_ref end (period boundary)
+
+Input clause: "From March 15, 2027 through the end of the Investment Period, the Management Fee rate shall be 1.75% per annum."
+
+Reasoning:
+- Absolute target rate → SET, value = 1.75%
+- Bounded window: literal start date ("March 15, 2027") and field_ref end ("end of the
+  Investment Period").
+- "End of the Investment Period" → fund_investment_end_date. The Investment Period is one
+  regime inside a fund's life, not the fund's whole term. Do NOT confuse with
+  "remainder of the Fund's term" / "fund's life" / "remaining term of the Fund," which map
+  to fund_term_end_date (see Example 4 for that pattern). Use the period referenced
+  literally in the clause text.
+- Same field_ref-as-end-date convention applies to any phrasing that names a fund-parameter
+  boundary as the expiry: "until the end of [period]", "ending at [period]", "through
+  [period]", "for the period ... ending at [period]". All map effective_end_date_expr to the
+  field_ref of the named period — never null, never the wrong period.
+
+```json
+[
+    {
+        "clause_text": "From March 15, 2027 through the end of the Investment Period, the Management Fee rate shall be 1.75% per annum.",
+        "affected_field": "management_fee_rate",
+        "action": "SET",
+        "condition_ast": null,
+        "value_expr": {
+            "node_type": "literal",
+            "op": null,
+            "value": 1.75,
+            "value_type": "percentage",
+            "field": null,
+            "fn": null,
+            "args": null
+        },
+        "effective_date_expr": {
+            "node_type": "literal",
+            "op": null,
+            "value": "2027-03-15",
+            "value_type": "date",
+            "field": null,
+            "fn": null,
+            "args": null
+        },
+        "effective_end_date_expr": {
+            "node_type": "field_ref",
+            "op": null,
+            "value": null,
+            "value_type": null,
+            "field": "fund_investment_end_date",
+            "fn": null,
+            "args": null
+        },
+        "gate_move_to_date_expr": null,
+        "gate_new_end_date_expr": null,
+        "gate_scope_mode": null,
+        "adjust_direction": null,
+        "adjust_mode": null,
+        "constraint_type": null,
+        "gate_target": null,
+        "gate_direction": null,
+        "no_action_reason": null,
+        "manual_review_reason": null
+    }
+]
+```
+
 ### Example 11: CONSTRAIN
 
 Input clause: "In no event shall the management fee exceed 2.0% per annum."
