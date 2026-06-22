@@ -555,7 +555,18 @@ Register-neutrality rule:
 
 A clause is a single complete legal obligation or rule, regardless of how many sentences or lettered sub-parts it spans. Before deciding where a clause begins and ends, apply the following boundary tests in order:
 
-1. Standalone test (run this FIRST, before any other boundary rule). When a document contains a list of items (numbered 1./2./3., lettered a./b./c., or bulleted •), apply the standalone test to each item:
+0. Operand-list pre-check (run this BEFORE the standalone test). First read the introductory sentence above the list. If that intro contains a comparative/superlative SELECTOR that takes the list items as its operands — "the earlier of", "the later of", "the earliest of", "the latest of", "the greater of", "the lesser of", "the sooner of", "the first to occur of" — then the numbered/lettered items are OPERANDS of a single rule, NOT independent rules.
+
+   → Treat the intro AND its list as ONE clause. Put the full text (intro sentence + all its items) into a single clause_text.
+   → Do NOT split the items into separate clauses.
+   → Do NOT treat the intro as a metadata carrier; do NOT route it to source_effective_date_condition (this is clause-level timing the clause interpreter resolves, not a document-level preamble).
+   → The standalone test (Rule 1) does NOT apply to such items. Skip directly past it.
+
+   Why: a rule of the form "<some change> shall take effect upon the {earlier|later} of: (a) <date or event>; (b) <date or event>" is ONE rule whose timing is the {minimum|maximum} of its operands. Each operand read in isolation is only a DATE or an EVENT — it has no field and no action, so it is not a governing rule on its own. Splitting the list severs the operands from the rule they belong to and destroys it (the rule loses its trigger; the operands become meaningless standalone fragments).
+
+   If the intro contains NO such selector → proceed to the standalone test (Rule 1) below.
+
+1. Standalone test (run this after the operand-list pre-check). When a document contains a list of items (numbered 1./2./3., lettered a./b./c., or bulleted •), apply the standalone test to each item:
 
    "Can this item be read as a complete governing rule on its own?"
 
@@ -581,6 +592,13 @@ A clause is a single complete legal obligation or rule, regardless of how many s
 
 If a document has 4 such numbered items, you MUST output 4 clauses — one per item.
 NEVER output a single clause containing all 4. This is a critical requirement.
+
+**Example that the OPERAND-LIST PRE-CHECK (Rule 0) catches — intro has a selector, so the WHOLE thing is ONE clause:**
+  - Intro: "The increased carried interest rate shall take effect on the later of:"
+    - "(a) the date the Fund returns all contributed capital to the Limited Partners; and"  ← an EVENT operand, not a rule
+    - "(b) December 31, 2030."  ← a DATE operand, not a rule
+    → Intro contains "the later of" → its list items are operands of that selector, not standalone rules → Rule 0 fires → output ONE clause whose clause_text is the intro PLUS both items. Do NOT split. Do NOT route intro to source_effective_date_condition.
+    (Contrast with the standalone PASS cases above, where each item is itself a complete rule with a field + action.)
 
 **Examples of items that FAIL the standalone test (intro is the governing head):**
   - Intro: "The Fund shall be dissolved upon any of the following:"
@@ -721,6 +739,12 @@ source_effective_date_condition:
   Test: Does the sentence introduce a list of separate rules?
     YES → document-level preamble → populate source_effective_date_condition
     NO  → clause-level timing → null (clause interpreter handles via effective_date_expr)
+
+  EXCEPTION — operand-list selector (see Clause Boundary Rule 0): if the intro contains a
+  comparative/superlative selector ("the earlier of", "the later of", "the greater of",
+  "the lesser of", etc.) whose list items are OPERANDS rather than separate rules, this is
+  NOT a document-level preamble. The whole intro+list is ONE clause and the timing stays
+  CLAUSE-LEVEL → source_effective_date_condition = null. Do not populate it from the intro.
 
   Examples of VALID source_effective_date_condition (document-level preamble):
     "The following terms will be effective from next fiscal quarter: 1. ... 2. ..."
