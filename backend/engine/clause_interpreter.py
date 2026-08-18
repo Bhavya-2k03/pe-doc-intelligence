@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 from typing import TYPE_CHECKING
 from dotenv import load_dotenv
 import asyncio
@@ -16,6 +18,75 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+# Textual cues that a clause bounds its effect to a time window. If any
+# SET/ADJUST/CONSTRAIN instruction comes back with a null
+# effective_end_date_expr while the clause text carries one of these cues,
+# the end date was likely dropped by the LLM (null is also the legal value
+# for "permanent", so schema validation cannot catch the omission).
+_BOUNDED_DURATION_CUE = re.compile(
+    r"\b("
+    r"until|through|during|ending|expir\w+"
+    r"|for the period"
+    r"|for the (?:first|second|third|fourth) quarter"
+    r"|for Q[1-4]"
+    r"|for the month"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Dev instrumentation: how often the missing-end-date backstop fired and
+# whether the single retry recovered an end date.
+RETRY_STATS = {"triggered": 0, "recovered": 0}
+
+
+def _missing_bounded_end(
+    instructions: list[ClauseInstruction], clause_text: str
+) -> bool:
+    """True if the clause signals a bounded window but no end date came back.
+
+    Only SET/ADJUST/CONSTRAIN are checked — GATE must not carry
+    effective_end_date_expr, and NO_ACTION/MANUAL_REVIEW have no timeline
+    effect.
+    """
+    if not _BOUNDED_DURATION_CUE.search(clause_text):
+        return False
+    return any(
+        instr.action in ("SET", "ADJUST", "CONSTRAIN")
+        and instr.effective_end_date_expr is None
+        for instr in instructions
+    )
+
+
+async def _call_interpreter_llm(
+    clause_text: str,
+    openai_client: AsyncOpenAI,
+) -> str:
+    """Single LLM call for clause interpretation; returns the raw response."""
+    user_message = f"<clause>\nclause_text: {clause_text}\n</clause>"
+
+    # Reasoning effort for clause interpretation. Default "low": measured on
+    # the e036 fee-waiver clause ("...for the period commencing January 1,
+    # 2028 and ending at the end of the Investment Period") — at effort none
+    # (temperature=0, no reasoning) the LLM dropped effective_end_date_expr
+    # ~1 in 11 runs, making the waiver permanent (25% fee error). Same fix
+    # class as EXTRACTION_REASONING_EFFORT in engine/extractor.py.
+    # Override via INTERPRETER_REASONING_EFFORT; "none" restores the old
+    # behavior.
+    effort = os.getenv("INTERPRETER_REASONING_EFFORT", "low")
+    sampling_kwargs: dict = (
+        {"temperature": 0} if effort == "none" else {"reasoning_effort": effort}
+    )
+
+    response = await openai_client.chat.completions.create(
+        model="gpt-5.2",
+        messages=[
+            {"role": "system", "content": CLAUSE_INTERPRETER_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        **sampling_kwargs,
+    )
+    return response.choices[0].message.content
+
 
 async def interpret_clause(
     clause_text: str,
@@ -26,26 +97,48 @@ async def interpret_clause(
     The LLM receives CLAUSE_INTERPRETER_PROMPT as the system message and the
     clause wrapped in <clause> tags as the user message.  Response is parsed
     and validated via parse_clause_instructions.
+
+    Backstop: if the clause text signals a bounded duration but the parsed
+    instructions carry no effective_end_date_expr, the call is retried
+    exactly once (never more). The retry result is kept only if it recovers
+    an end date; otherwise the first result stands.
     """
-    user_message = f"<clause>\nclause_text: {clause_text}\n</clause>"
-
     try:
-        response = await openai_client.chat.completions.create(
-            model="gpt-5.2",
-            temperature=0,
-
-            messages=[
-                {"role": "system", "content": CLAUSE_INTERPRETER_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-        )
+        raw_json = await _call_interpreter_llm(clause_text, openai_client)
     except Exception:
         logger.exception("OpenAI API call failed for clause: %.120s", clause_text)
         raise
 
-    raw_json = response.choices[0].message.content
-    print("raw_json is: ", raw_json)
-    return parse_clause_instructions(raw_json)
+    logger.debug("Interpreter raw response: %s", raw_json)
+    instructions = parse_clause_instructions(raw_json)
+
+    if _missing_bounded_end(instructions, clause_text):
+        RETRY_STATS["triggered"] += 1
+        logger.warning(
+            "Bounded-duration cue present but effective_end_date_expr is null; "
+            "retrying once for clause: %.120s",
+            clause_text,
+        )
+        try:
+            retry_raw = await _call_interpreter_llm(clause_text, openai_client)
+            retry_instructions = parse_clause_instructions(retry_raw)
+        except Exception:
+            # First result is valid; a failed retry must not break the pipeline.
+            logger.exception(
+                "Retry failed for clause: %.120s — keeping first result",
+                clause_text,
+            )
+            return instructions
+        if not _missing_bounded_end(retry_instructions, clause_text):
+            RETRY_STATS["recovered"] += 1
+            return retry_instructions
+        logger.warning(
+            "Retry also returned null effective_end_date_expr — keeping first "
+            "result for clause: %.120s",
+            clause_text,
+        )
+
+    return instructions
 
 
 async def resolve_date_condition(
