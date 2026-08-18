@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sqlite3
+from datetime import date
 from typing import Any
 
 from dotenv import load_dotenv
@@ -112,6 +113,58 @@ async def startup():
 SEED_DB_PATH = os.getenv("SEED_DB_PATH", "db.sqlite")
 DATABASE_URL = os.getenv("DATABASE_URL")  # Postgres URL (optional)
 
+# Local package overrides (dev only). If backend/local_packages/<package>.json
+# exists, session/start serves it INSTEAD of the database — letting a modified
+# scenario be tested locally without pushing anything to Supabase/prod.
+# Attachments referenced with file_id "local::<filename>" resolve from
+# backend/local_packages/files/. The directory is gitignored and absent in
+# prod, so deployed behavior is unchanged.
+LOCAL_PACKAGES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_packages")
+
+
+def _parse_iso_date(value: str | None) -> date | None:
+    """Parse a YYYY-MM-DD (or ISO timestamp) string to a date, else None.
+
+    Email dates arrive in both forms — '2024-11-17' and
+    '2024-12-24T10:00:00Z' — so the time component is trimmed first.
+    """
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value).split("T")[0])
+    except ValueError:
+        return None
+
+
+def _fetch_seed_emails_local(package: str) -> list[dict] | None:
+    """Return a local package definition if one exists, else None."""
+    path = os.path.join(LOCAL_PACKAGES_DIR, f"{package}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            emails = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        logger.exception("Failed to load local package %s — falling back to DB", path)
+        return None
+    logger.warning("Serving LOCAL package override for %r from %s "
+                   "(DB not consulted)", package, path)
+    return emails
+
+
+def _fetch_attachment_bytes_local(file_id: str) -> bytes | None:
+    """Resolve a 'local::<filename>' attachment from local_packages/files/."""
+    name = file_id[len("local::"):]
+    # basename() strips any path components — a traversal attempt like
+    # "local::../../.env" resolves to just ".env" inside the files dir.
+    name = os.path.basename(name)
+    path = os.path.join(LOCAL_PACKAGES_DIR, "files", name)
+    if not os.path.exists(path):
+        logger.error("Local attachment not found: %s", path)
+        return None
+    with open(path, "rb") as f:
+        return f.read()
+
 
 def _fetch_seed_emails_sqlite(db_path: str, package: str | None = None) -> list[dict]:
     """Load seed emails from SQLite for demo."""
@@ -200,7 +253,14 @@ async def _fetch_seed_emails_postgres(database_url: str, package: str | None = N
 
 
 async def fetch_seed_emails(package: str | None = None) -> list[dict]:
-    """Fetch seed emails from configured source, optionally filtered by package."""
+    """Fetch seed emails from configured source, optionally filtered by package.
+
+    Resolution order: local override (dev only) → Postgres → SQLite.
+    """
+    if package and package != "custom":
+        local = _fetch_seed_emails_local(package)
+        if local is not None:
+            return local
     if DATABASE_URL:
         return await _fetch_seed_emails_postgres(DATABASE_URL, package)
     return _fetch_seed_emails_sqlite(SEED_DB_PATH, package)
@@ -241,7 +301,12 @@ async def _fetch_attachment_bytes_postgres(file_id: str) -> bytes | None:
 
 
 async def fetch_attachment_bytes(file_id: str) -> bytes | None:
-    """Fetch PDF bytes from configured source."""
+    """Fetch PDF bytes from configured source.
+
+    Resolution order: local override (dev only) → Postgres → SQLite.
+    """
+    if file_id.startswith("local::"):
+        return _fetch_attachment_bytes_local(file_id)
     if DATABASE_URL:
         return await _fetch_attachment_bytes_postgres(file_id)
     return _fetch_attachment_bytes_sqlite(file_id)
@@ -392,13 +457,56 @@ async def session_evaluate(session_id: str, body: EvaluateRequest):
                         for a in atts:
                             _f.write(f"    [{a.get('attachment_index')}] {a.get('name')} file_id={a.get('file_id')} has_data={bool(a.get('file_data'))}\n")
 
+            # ── Step 0: Restrict to documents that exist as of the eval date ──
+            #
+            # An email that arrives after the evaluation date has not been
+            # received yet at that point in time, so nothing in it may inform
+            # the result — the timelines and clause dispositions already drop
+            # it downstream. Filtering here as well means we do not spend a
+            # LlamaParse call and a GPT extraction call on a document whose
+            # output is guaranteed to be discarded.
+            #
+            # Undated or unparseable emails are kept (fail-open): dropping a
+            # document because we could not read its date would be a silent
+            # omission, which is worse than doing the extra work.
+            in_scope_emails = emails
+            skipped_emails: list[dict] = []
+            eval_date = _parse_iso_date(body.evaluation_date)
+            if eval_date is not None:
+                in_scope_emails, skipped_emails = [], []
+                for em in emails:
+                    em_date = _parse_iso_date(em.get("date", ""))
+                    if em_date is not None and em_date > eval_date:
+                        skipped_emails.append(em)
+                    else:
+                        in_scope_emails.append(em)
+
+            if skipped_emails:
+                # Its own stage, not "parsing": the frontend terminal collapses
+                # consecutive same-stage events into one updating line, so a
+                # "parsing" message here would be overwritten by the next
+                # parsing event before the user could read it.
+                # Count only — internal ids ("e035", or "new_1712..." for an
+                # email the user just added) are meaningless to a reader.
+                n = len(skipped_emails)
+                await on_progress(
+                    "scope",
+                    f"Skipped {n} document{'s' if n != 1 else ''} dated after "
+                    f"{body.evaluation_date}",
+                )
+                logger.info(
+                    "Eval date %s — skipping %d future-dated email(s): %s",
+                    body.evaluation_date, len(skipped_emails),
+                    ", ".join(str(e.get("_id")) for e in skipped_emails),
+                )
+
             # ── Step 1: Resolve attachment bytes + parse all PDFs in parallel ──
             await on_progress("parsing", "Resolving attachments...")
             attachment_texts_by_email: dict[str, list[dict]] = {}
 
             # Collect all attachments across all emails
             all_attachments: list[dict] = []  # each has email_id + file info
-            for email in emails:
+            for email in in_scope_emails:
                 email_id = email.get("_id", "")
                 attachments = email.get("attachments", [])
                 for att in attachments:
@@ -426,8 +534,9 @@ async def session_evaluate(session_id: str, body: EvaluateRequest):
 
             # Parse all PDFs in one parallel batch
             if all_attachments:
-                await on_progress("parsing", f"Parsing {len(all_attachments)} PDFs...")
-                parsed_list = await parse_attachments(all_attachments, session.parse_cache)
+                parsed_list = await parse_attachments(
+                    all_attachments, session.parse_cache, on_progress=on_progress,
+                )
 
                 # Distribute results back by email_id
                 for att_input, parsed_output in zip(all_attachments, parsed_list):
@@ -437,9 +546,8 @@ async def session_evaluate(session_id: str, body: EvaluateRequest):
                     attachment_texts_by_email[eid].append(parsed_output)
 
             # ── Step 2: Extract (Layer 1) ─────────────────────────
-            await on_progress("layer1", "Starting extraction...")
             extraction_results = await extract_all_emails(
-                email_dataset=emails,
+                email_dataset=in_scope_emails,
                 attachment_texts_by_email=attachment_texts_by_email,
                 field_registry=emails_and_attachment_fields,
                 openai_client=openai_client,
