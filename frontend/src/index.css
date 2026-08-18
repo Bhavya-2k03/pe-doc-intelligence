@@ -24,6 +24,14 @@ body {
 
 .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 
+/* Text selection — the browser default is a blue fill that leaves the
+   theme's cyan and slate text unreadable. Force an explicit pair so
+   highlighting a figure mid-demo actually points at it. Near-black on the
+   accent cyan is ~11:1 contrast, and holds for every text colour in the app
+   because the selection colour is stated, not inherited. */
+::selection { background: #22d3ee; color: #06070b; text-shadow: none; }
+::-moz-selection { background: #22d3ee; color: #06070b; text-shadow: none; }
+
 /* ═══════════════════════════════════════════════
    BLOOMBERG TERMINAL EFFECTS
    ═══════════════════════════════════════════════ */

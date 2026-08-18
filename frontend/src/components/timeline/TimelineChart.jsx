@@ -3,14 +3,48 @@ import * as d3 from 'd3';
 
 const COLORS = ['#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#fb7185', '#60a5fa', '#f472b6', '#2dd4bf', '#818cf8', '#f59e0b'];
 
-function fmtVal(v) {
+// Rates and percentages arrive as plain numbers (2.0 means 2%), indistinguishable
+// on the wire from currency amounts. Only the field name separates them, so
+// formatting is keyed off it \u2014 otherwise a 2% fee rate renders as "$2".
+const isPercentField = name => /(_rate$|_rate_|percentage|_pct)/.test(name || '');
+
+// Drop trailing zeros after fixing decimals: 2.05 -> "2.05", 2.20 -> "2.2", 10.00 -> "10"
+const trimZeros = s => (s.includes('.') ? s.replace(/\.?0+$/, '') : s);
+
+// Abbreviate to at most `dp` decimals.
+// Fixed 1-decimal rounding misreported values: 2,050,000 rendered as "$2.0M"
+// (2.05 is 2.0499\u2026 in binary floating point, so toFixed(1) rounds DOWN) and
+// 1,250,000 as "$1.3M". Amounts here are fee inputs \u2014 a label must not state
+// a number the engine did not compute.
+function abbrCurrency(v, dp) {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  const [div, unit] = abs >= 1e6 ? [1e6, 'M'] : [1e3, 'K'];
+  return `${sign}$${trimZeros((abs / div).toFixed(dp))}${unit}`;
+}
+
+function fmtNumber(v, fieldName) {
+  if (isPercentField(fieldName)) return `${trimZeros(v.toFixed(4))}%`;
+  if (Math.abs(v) >= 1e3) return abbrCurrency(v, 2);
+  const sign = v < 0 ? '-' : '';
+  return `${sign}$${Math.abs(v).toLocaleString('en-US')}`;
+}
+
+function fmtVal(v, fieldName) {
+  if (v == null) return '\u2014';
+  if (typeof v === 'number') return fmtNumber(v, fieldName);
+  return String(v).length > 16 ? String(v).slice(0, 14) + '\u2026' : String(v);
+}
+
+// Exact, unabbreviated \u2014 used where there is room to show the true number.
+function fmtExact(v, fieldName) {
   if (v == null) return '\u2014';
   if (typeof v === 'number') {
-    if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-    if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
-    return String(v);
+    if (isPercentField(fieldName)) return `${trimZeros(v.toFixed(4))}%`;
+    const sign = v < 0 ? '-' : '';
+    return `${sign}$${Math.abs(v).toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
   }
-  return String(v).length > 16 ? String(v).slice(0, 14) + '\u2026' : String(v);
+  return String(v);
 }
 
 function resolveTimeline(entries) {
@@ -55,6 +89,8 @@ function resolveTimeline(entries) {
         end_date: end,
         value: winner.value,
         source: winner.source,
+        as_of_label: winner.as_of_label ?? null,
+        is_observation: winner.is_observation ?? false,
       });
     }
   }
@@ -70,6 +106,8 @@ function resolveTimeline(entries) {
         end_date: null,
         value: lastEntry.value,
         source: lastEntry.source,
+        as_of_label: lastEntry.as_of_label ?? null,
+        is_observation: lastEntry.is_observation ?? false,
       });
     }
   }
@@ -116,6 +154,13 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
     });
 
     // ── Render entry bars ─────────────────────────────────────────
+    // Labels for bars too narrow to hold text are drawn above the bar. Track
+    // what has been placed so adjacent narrow bars (e.g. consecutive quarterly
+    // observations) stagger onto a second row instead of overprinting each
+    // other. Anything that still cannot fit is dropped — the tooltip has it.
+    const placedLabels = [];
+    const LABEL_ROWS = 2;
+
     parsed.forEach((e, i) => {
       if (e.d >= maxD) return;
       const s = x(e.d);
@@ -134,23 +179,42 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
             x: ev.clientX, y: ev.clientY, value: e.value,
             date: e.date, endDate: e.end_date, source: e.source,
             effectiveValue: effectiveVal ?? null,
+            asOfLabel: e.as_of_label ?? null,
+            isObservation: e.is_observation ?? false,
           });
         })
         .on('mousemove', ev => setTip(p => p ? { ...p, x: ev.clientX, y: ev.clientY } : null))
         .on('mouseleave', ev => { d3.select(ev.target).attr('opacity', 0.75); setTip(null); });
+
+      const label = fmtVal(e.value, fieldName);
 
       if (ew > 30) {
         g.append('text').attr('x', s + ew / 2).attr('y', barH / 2).attr('dy', '0.35em')
           .attr('text-anchor', 'middle').attr('fill', '#06070b')
           .attr('font-size', '11px').attr('font-weight', '700')
           .attr('font-family', 'JetBrains Mono, monospace')
-          .attr('pointer-events', 'none').text(fmtVal(e.value));
+          .attr('pointer-events', 'none').text(label);
       } else {
-        g.append('text').attr('x', s + ew / 2).attr('y', -3)
-          .attr('text-anchor', 'middle').attr('fill', c)
-          .attr('font-size', '9px').attr('font-weight', '700')
-          .attr('font-family', 'JetBrains Mono, monospace')
-          .attr('pointer-events', 'none').text(fmtVal(e.value));
+        // ~5.6px per char at 9px monospace, plus a 4px gutter between labels
+        const halfW = (label.length * 5.6) / 2;
+        const cx = s + ew / 2;
+        const x0 = cx - halfW;
+        const x1 = cx + halfW;
+
+        let row = 0;
+        while (
+          row < LABEL_ROWS &&
+          placedLabels.some(p => p.row === row && x0 < p.x1 + 4 && x1 > p.x0 - 4)
+        ) row++;
+
+        if (row < LABEL_ROWS) {
+          placedLabels.push({ x0, x1, row });
+          g.append('text').attr('x', cx).attr('y', -3 - row * 10)
+            .attr('text-anchor', 'middle').attr('fill', c)
+            .attr('font-size', '9px').attr('font-weight', '700')
+            .attr('font-family', 'JetBrains Mono, monospace')
+            .attr('pointer-events', 'none').text(label);
+        }
       }
     });
 
@@ -200,7 +264,7 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
         .attr('fill', color).attr('font-size', '8px').attr('font-weight', '700')
         .attr('font-family', 'JetBrains Mono, monospace')
         .attr('pointer-events', 'none')
-        .text(`${arrow} ${c.type} ${fmtVal(c.bound)}`);
+        .text(`${arrow} ${c.type} ${fmtVal(c.bound, fieldName)}`);
     });
 
     // ── X axis ────────────────────────────────────────────────────
@@ -217,10 +281,27 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
       {tip && (
         <div className="fixed z-[100] px-3 py-2 bg-[#12131a] border border-white/10 text-[11px] rounded shadow-xl pointer-events-none max-w-xs"
           style={{ left: tip.x + 12, top: tip.y - 10, transform: 'translateY(-100%)' }}>
-          <div className="font-bold text-cyan-400 font-mono text-[13px] mb-0.5">{fmtVal(tip.value)}</div>
+          <div className="font-bold text-cyan-400 font-mono text-[13px] mb-0.5">{fmtExact(tip.value, fieldName)}</div>
           <div className="text-slate-500 space-y-0.5">
-            <div>From: <span className="text-slate-400 font-mono">{tip.date}</span></div>
-            {tip.endDate && <div>Until: <span className="text-slate-400 font-mono">{tip.endDate}</span></div>}
+            {/* A reported observation and a clause-set value mean different
+                things. An observation is measured AT a date and stands as the
+                last known figure until the next report — "From/Until" would
+                overclaim it as a period of validity. A clause genuinely does
+                set a value across a window, so it keeps From/Until. */}
+            {tip.isObservation ? (
+              <>
+                {tip.asOfLabel && (
+                  <div>Reported as of: <span className="text-cyan-300 font-mono">{tip.asOfLabel}</span></div>
+                )}
+                <div>Observed: <span className="text-slate-400 font-mono">{tip.date}</span></div>
+                {tip.endDate && <div>Superseded: <span className="text-slate-400 font-mono">{tip.endDate}</span></div>}
+              </>
+            ) : (
+              <>
+                <div>From: <span className="text-slate-400 font-mono">{tip.date}</span></div>
+                {tip.endDate && <div>Until: <span className="text-slate-400 font-mono">{tip.endDate}</span></div>}
+              </>
+            )}
             {tip.source && <div className="mt-1 pt-1 border-t border-white/[0.06] text-slate-450 italic leading-relaxed">{tip.source.slice(0, 100)}</div>}
           </div>
         </div>

@@ -424,6 +424,39 @@ Resolution order:
 
 ---
 
+### Period-Column Tables — every dated column is an observation
+
+Financial tables often serialize a time series: line items as rows, reporting
+periods as columns, each column headed by a period label (a quarter, a month,
+a year, or an explicit date). A markdown table whose column headers are period
+labels is such a table.
+
+1. **Every (row, period-column) cell is a distinct dated observation.** For
+   each row that maps to a registry field, emit ONE entry PER period column —
+   never only the latest column. Prior-period columns are historical
+   observations of the same field; they belong on the field's timeline with
+   their own as-of timing. Dropping them discards data the document reports.
+
+2. **The column header supplies each entry's timing:**
+   - Header (or a line elsewhere in the document defining that column, e.g.
+     an "As of Date:" line) gives an explicit calendar date → `value_as_of_date`.
+   - Header is a relative period label (a quarter such as "Q3 2029", a month,
+     a fiscal-year label) → `value_as_of_condition` = the label VERBATIM.
+
+3. **NEVER convert a period label into a calendar date yourself.** Fiscal
+   periods are fund-specific — anchored to fund dates you do not know. The
+   engine resolves the label downstream against the fund's own calendar.
+   Emitting `value_as_of_condition = "Q3 2029"` is correct; emitting a guessed
+   `value_as_of_date` for that quarter is wrong even if the guess seems obvious.
+
+4. **Row labels carry the field identity; column headers carry the timing.**
+   Apply the synonym mapping to the row label, and the standard 5-layer scope
+   hierarchy to the table's surrounding context (cells rarely carry their own
+   local attribution, so section headers and document context typically govern
+   the whole table).
+
+---
+
 ### Field Name Synonym Mapping
 
 The field names in `emails_and_attachment_fields` are technical registry names. Source
@@ -438,8 +471,7 @@ documents use natural language. Map the following synonyms to registry field nam
 | "paid-in capital", "total paid-in", "capital called", "total capital called", "drawn capital", "cumulative drawdowns" | fund_total_paid_in_capital |
 | "investor invested", "LP invested capital", "LP invested amount", "your invested capital", "LP capital deployed" | investor_invested_capital |
 | "investor realization", "LP realization", "your realization %" | investor_percentage_realized |
-| "investor realized", "LP realized capital" | investor_total_realized_capital |
-| "total commitments", "aggregate commitments", "fund size" (as committed amount) | total_fund_committed_capital |
+| "investor realized", "LP realized capital", "your distributions", "cumulative distributions" (in an LP's own account statement — investor scope) | investor_total_realized_capital |
 | "GP commitment", "general partner commitment" | gp_commitment_amount |
 | "initial closing", "first closing", "first close" | fund_initial_closing_date |
 | "final closing", "last closing", "final close" | fund_final_closing_date |
@@ -491,6 +523,21 @@ It looks FORWARD. It uses language like:
   For prescribing sentences: extract as clause. The "next quarter" / "after investment
   period" is clause-level timing handled by the clause interpreter via effective_date_expr.
   Do NOT extract as a field with value_as_of_condition.
+
+**Refinement — reported terms of an existing obligation:** A future-dated term is NOT
+automatically prescriptive. Ask: does THIS document CREATE or MODIFY the rule, or does
+it REPORT a term that already exists elsewhere?
+  - A notice, statement, or report RESTATING a term of an already-existing obligation —
+    an existing facility's repayment due date, an existing loan's maturity, the current
+    rate on an existing arrangement — is REPORTING. The future date is an attribute of
+    the obligation, exactly like its principal balance. If the field registry has a
+    field for it, extract it as a field.
+    Example: a facility balance notice stating "the outstanding balance is payable on
+    or before [date]" reports an existing repayment term → field.
+  - A document that ESTABLISHES or CHANGES such a term ("the due date is hereby
+    extended to...", "repayment shall now be due...") is PRESCRIBING → clause.
+  Signal: operative language of change (hereby, amended, extended, waived, modified)
+  marks prescription; its absence in a notice restating existing terms marks reporting.
 
 **CRITICAL: value_as_of_condition is ONLY for reporting sentences** — backward-looking
 temporal qualifiers on observed data (realization %, distributions, invested capital, etc.).

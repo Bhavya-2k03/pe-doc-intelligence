@@ -22,6 +22,7 @@ function InputTooltip({ text }) {
 }
 
 const STAGES = {
+  scope: { l: 'SCOPE', c: '#94a3b8' },
   parsing: { l: 'PARSE', c: '#22d3ee' }, layer1: { l: 'EXTRACT', c: '#60a5fa' },
   layer2: { l: 'INTERPRET', c: '#a78bfa' }, layer3: { l: 'RESOLVE', c: '#fbbf24' },
   layer4: { l: 'CONFIRM', c: '#34d399' }, layer5: { l: 'EXECUTE', c: '#fb7185' },
@@ -141,7 +142,7 @@ const SCENARIO_INFO = {
     description: 'A side letter defers the post-investment-period fee reduction until the earlier of (a) the 8th anniversary of final closing or (b) the fund reaching 50% realization. Both conditions resolve after IP end, so the engine holds the rate until one fires.',
     lookFor: [
       'Compound "earlier-of" condition mixing a fixed post-IP-end date and a dynamic fund metric. The engine resolves both and applies whichever fires first.',
-      '(a) resolves to 2032-12-15 (2024-12-15 final closing + 8 years). (b) resolves to 2030-12-31 when Q4 2030 realization hits 62%. (b) wins by about two years.',
+      '(a) resolves to 2032-12-15 (2024-12-15 final closing + 8 years). (b) resolves to 2031-01-15 when Q4 2030 realization hits 62%. (b) wins by about two years.',
       'At IP end (2029-01-15), the LPA baseline would drop the rate from 2% to 1.5%. The side letter gates that reduction behind (a) or (b); neither has fired yet, so the engine correctly holds the rate at 2%.',
       'Try evaluation date 2029-06-01 (5 months past IP end; gate closed, rate stays at 2%). Compare with 2031-02-01 (post-trigger; gate opens, and the timeline shows the reduction applying retroactively from IP end as the entitlement is confirmed).',
     ],

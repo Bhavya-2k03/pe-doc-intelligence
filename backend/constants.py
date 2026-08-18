@@ -63,11 +63,17 @@ emails_and_attachment_fields = [
         "entity_scope": "fund",
         "scope_is_semantically_unambiguous": True,
     },
-    {
-        "name": "total_fund_committed_capital",
-        "entity_scope": "fund",
-        "scope_is_semantically_unambiguous": False,
-    },
+    # NOTE: capital commitments (investor and fund total) are deliberately NOT
+    # extractable fields. A commitment is a contractual term established by the
+    # subscription agreement and closings; a capital account statement or
+    # realization report only RESTATES it and has no authority to change it.
+    # Commitments still change — but via a prescribing document, which the
+    # clause interpreter handles (they remain in parsed_field_name_list and the
+    # interpreter's field registry). Extracting the restatement wrote redundant
+    # timeline segments for an unchanged value, and worse, would let a reported
+    # figure silently overwrite the contractual term when the two disagreed.
+    # Reconciling and flagging such a disagreement is the right answer; that is
+    # not built yet, so the silent-overwrite path is closed instead.
     {
         "name": "gp_commitment_amount",
         "entity_scope": "gp",
@@ -98,6 +104,7 @@ emails_and_attachment_fields = [
         "entity_scope": "fund",
         "scope_is_semantically_unambiguous": False,
     },
+    # investor_commitment_amount intentionally absent — see note above.
     {
         "name": "investor_invested_capital",
         "entity_scope": "investor",

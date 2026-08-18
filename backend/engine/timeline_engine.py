@@ -48,6 +48,18 @@ class TimelineEntry(BaseModel):
     document_date: Optional[date] = None
     email_source_id: Optional[str] = None
     clause_id: Optional[str] = None
+    # True when this entry came from a value REPORTED in a document (a
+    # measurement) rather than SET by a clause (a rule). The two carry
+    # different meaning: an observation is measured AT `date` and stands as
+    # the last known figure until the next report, whereas a clause genuinely
+    # sets a value across [date, end_date). Set in exactly one place —
+    # pipeline.insert_extracted_fields — so it tracks where the entry came
+    # from, never a list of field names. Display-only: no engine logic reads it.
+    is_observation: bool = False
+    # For an observation reported under a period label ("as of Q4 2029"), the
+    # original label before it was resolved to a calendar date. None when the
+    # document gave an explicit date instead.
+    as_of_label: Optional[str] = None
 
 
 class ConstraintRule(BaseModel):
@@ -218,6 +230,15 @@ def _fn_investor_realization_pct(
         val = tl.value_at(ctx.evaluation_date)
         if val is not None:
             return val
+    # Same derivation fallback as FUND_REALIZATION_PCT, at investor level:
+    # cumulative amounts realized (distributions received) over invested.
+    realized_tl = timelines.get("investor_realized_amount")
+    invested_tl = timelines.get("investor_invested_capital")
+    if realized_tl and invested_tl:
+        r = realized_tl.value_at(ctx.evaluation_date)
+        i = invested_tl.value_at(ctx.evaluation_date)
+        if r is not None and i is not None and i != 0:
+            return (r / i) * 100
     return 0
 
 
