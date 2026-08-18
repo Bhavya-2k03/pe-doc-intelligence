@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Info, AlertTriangle, FileQuestion, BarChart3, Maximize2, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, Info, AlertTriangle, FileQuestion, BarChart3, Maximize2, Shield, CircleSlash } from 'lucide-react';
 import FeeVerdict from '../evaluation/FeeVerdict';
 import FeeBreakdown from '../evaluation/FeeBreakdown';
 
@@ -108,10 +108,20 @@ export default function ResultsPanel({ result, onShowTimelines }) {
               <div className="space-y-2">
                 {result.manual_review_items.map((m, i) => (
                   <div key={i} className="px-2.5 py-2 rounded bg-amber-500/[0.04] border border-amber-500/[0.08]">
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className="doc-badge bg-amber-500/10 text-amber-400">{m.affected_field}</span>
-                    </div>
-                    <p className="text-[11px] text-amber-500/60 leading-relaxed">{m.reason}</p>
+                    {/* Rendered only when known — MANUAL_REVIEW frequently
+                        means the field could not be identified, and an empty
+                        badge reads as a rendering bug. */}
+                    {m.affected_field && (
+                      <div className="flex items-center gap-1 mb-1">
+                        <span className="doc-badge bg-amber-500/10 text-amber-400">{m.affected_field}</span>
+                      </div>
+                    )}
+                    {m.clause_text && (
+                      <p className="text-[11px] text-slate-300 leading-relaxed break-words mb-1">
+                        {m.clause_text}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-amber-500/60 leading-relaxed break-words">{m.reason}</p>
                   </div>
                 ))}
               </div>
@@ -147,11 +157,31 @@ export default function ResultsPanel({ result, onShowTimelines }) {
                         {!c.active_from && !c.active_until && <span>Always active</span>}
                       </div>
                       {c.source && (
-                        <div className="text-[10px] text-slate-500 italic mt-1 leading-relaxed truncate">{c.source.slice(0, 80)}</div>
+                        <div className="text-[10px] text-slate-500 italic mt-1 leading-relaxed break-words">{c.source}</div>
                       )}
                     </div>
                   ))
                 )}
+              </div>
+            </CollapsibleSection>
+          </>
+        )}
+
+        {/* No Action — clauses read and deliberately not applied */}
+        {result.no_action_items?.length > 0 && (
+          <>
+            <div className="bloomberg-divider" />
+            <CollapsibleSection title="No Action" icon={CircleSlash} color="text-slate-500"
+              count={result.no_action_items.length} defaultOpen={false}>
+              <div className="space-y-2">
+                {result.no_action_items.map((n, i) => (
+                  <div key={i} className="px-2.5 py-2 rounded bg-white/[0.02] border border-white/[0.04]">
+                    <p className="text-[10px] text-slate-400 leading-relaxed break-words">{n.clause_text}</p>
+                    {n.reason && (
+                      <p className="text-[10px] text-slate-600 italic mt-1 leading-relaxed break-words">{n.reason}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </CollapsibleSection>
           </>

@@ -12,6 +12,12 @@ const fmtDate = d => {
   return `${m} '${y}`;
 };
 
+// Whole-dollar amount for the fee basis. Cents are noise at commitment
+// scale and cost width the narrow panel does not have.
+const fmtBasisAmount = v => v == null ? '—' : new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: 'USD', maximumFractionDigits: 0
+}).format(v);
+
 // Abbreviate basis labels to fit narrow panels
 const fmtBasis = b => {
   if (!b) return '—';
@@ -38,26 +44,39 @@ function Table({ subPeriods, label, total }) {
         </div>
       ) : (
         <div className="rounded border border-white/[0.05] overflow-hidden">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse table-fixed">
             <thead>
               <tr className="bg-white/[0.02]">
-                <th className="text-left text-[9px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5">Period</th>
-                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1.5">Days</th>
-                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1.5">Rate</th>
-                <th className="text-left text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1.5">Basis</th>
-                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5">Fee</th>
+                <th className="text-left text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1.5 py-1.5 w-[26%]">Period</th>
+                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1 py-1.5 w-[9%]">Days</th>
+                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1 py-1.5 w-[12%]">Rate</th>
+                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1.5 w-[25%]">Basis</th>
+                <th className="text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1.5 w-[28%]">Fee</th>
               </tr>
             </thead>
             <tbody>
               {subPeriods.map((sp, i) => (
-                <tr key={i} className="border-t border-white/[0.03] hover:bg-white/[0.015] transition">
-                  <td className="px-3 py-2 text-[11px] text-slate-400 font-mono whitespace-nowrap">
-                    {fmtDate(sp.start)}{' – '}{fmtDate(sp.end)}
+                <tr key={i} className="border-t border-white/[0.03] hover:bg-white/[0.015] transition align-top">
+                  {/* Dates stack so the widest column cannot force overflow
+                      in the 400px panel (most laptops sit below the 2xl
+                      breakpoint that widens it). */}
+                  <td className="px-1.5 py-2 text-[10px] text-slate-400 font-mono leading-snug">
+                    <div className="whitespace-nowrap">{fmtDate(sp.start)}</div>
+                    <div className="whitespace-nowrap text-slate-500">{'→ '}{fmtDate(sp.end)}</div>
                   </td>
-                  <td className="px-2 py-2 text-[11px] text-slate-400 font-mono text-right">{sp.days}</td>
-                  <td className="px-2 py-2 text-[11px] text-cyan-400 font-mono font-bold text-right">{sp.annual_rate}%</td>
-                  <td className="px-2 py-2 text-[11px] text-slate-400">{fmtBasis(sp.basis_label)}</td>
-                  <td className="px-3 py-2 text-[11px] text-slate-200 font-mono font-bold text-right whitespace-nowrap">{fmt(sp.fee_amount)}</td>
+                  <td className="px-1 py-2 text-[11px] text-slate-400 font-mono text-right">{sp.days}</td>
+                  <td className="px-1 py-2 text-[11px] text-cyan-400 font-mono font-bold text-right">{sp.annual_rate}%</td>
+                  {/* Amount leads and is right-aligned so basis and fee read
+                      as one column of figures; the label qualifies it. */}
+                  <td className="px-2 py-2 text-right leading-snug">
+                    <div className="text-[11px] font-mono text-slate-300 whitespace-nowrap">
+                      {fmtBasisAmount(sp.basis_amount)}
+                    </div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wide break-words">
+                      {fmtBasis(sp.basis_label)}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 text-[11px] text-slate-200 font-mono font-bold text-right whitespace-nowrap">{fmt(sp.fee_amount)}</td>
                 </tr>
               ))}
             </tbody>
