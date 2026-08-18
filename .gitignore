@@ -30,6 +30,10 @@ backend/db.sqlite
 backend/files/
 backend/_deprecated/
 test_prompt_output.txt
+backend/scripts/_*
+backend/local_packages/
+# DB snapshots from scripts/backup_supabase.py — contain PDF bytes.
+backend/backups/
 sqlite3.exe
 
 # ── Editor & OS ───────────────────────────────────────────
@@ -46,3 +50,8 @@ CLAUDE.md
 ARCHITECTURE.md
 FRONTEND_SPEC.md
 FRONTEND_CONTEXT.md
+Conversation_history.txt
+sunil-call-prep.md
+interview-prep
+learnings.md
+backend/files
