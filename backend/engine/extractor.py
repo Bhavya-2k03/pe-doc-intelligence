@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from typing import Any, TYPE_CHECKING
 
 
@@ -102,10 +103,21 @@ async def _call_extraction_llm(
 
     user_message = json.dumps(input_obj, default=str)
 
+    # Reasoning effort for extraction. Default "low": measured on the graded
+    # golden set (scripts/battle_test_extraction.py) — LP capital-account
+    # statements (fund letterhead + LP subject + period-column tables) extract
+    # ~35% at effort none vs ~100% at low, with prior-period columns emitted
+    # as correctly dated timeline entries. Cost: ~4s → ~13s per call.
+    # Override via EXTRACTION_REASONING_EFFORT; set "none" to restore the old
+    # behavior (temperature=0, no reasoning).
+    effort = os.getenv("EXTRACTION_REASONING_EFFORT", "low")
+    sampling_kwargs: dict = (
+        {"temperature": 0} if effort == "none" else {"reasoning_effort": effort}
+    )
+
     try:
         response = await openai_client.chat.completions.create(
             model="gpt-5.2",
-            temperature=0,
             messages=[
                 {
                     "role": "system",
@@ -113,6 +125,7 @@ async def _call_extraction_llm(
                 },
                 {"role": "user", "content": user_message},
             ],
+            **sampling_kwargs,
         )
     except Exception:
         logger.exception("Extraction LLM call failed for email %s",
@@ -222,6 +235,11 @@ async def extract_email(
     return result
 
 
+def _plural(n: int, noun: str) -> str:
+    """'1 email' / '2 emails' — progress lines are user-facing copy."""
+    return noun if n == 1 else f"{noun}s"
+
+
 async def extract_all_emails(
     email_dataset: list[dict],
     attachment_texts_by_email: dict[str, list[dict]],
@@ -230,26 +248,82 @@ async def extract_all_emails(
     extraction_cache: dict[str, ExtractionResult],
     on_progress: Any = None,
 ) -> list[ExtractionResult]:
-    """Extract all emails in a dataset in parallel. Handles caching and diffing."""
+    """Extract all emails in a dataset in parallel. Handles caching and diffing.
+
+    Progress counts reflect the work actually being done: emails already in
+    extraction_cache are reported as cached rather than being counted as
+    extractions in flight. The cached/uncached split is therefore computed
+    up front, which costs one hash per email and no LLM calls.
+    """
     import asyncio
     total = len(email_dataset)
 
+    # Partition before dispatching so the reported numbers are true.
+    cached_by_idx: dict[int, ExtractionResult] = {}
+    to_extract: list[tuple[int, dict]] = []
+    for i, email_data in enumerate(email_dataset):
+        att_texts = attachment_texts_by_email.get(email_data.get("_id", "?"))
+        pkg_hash = compute_email_hash(build_email_package(email_data, att_texts))
+        if pkg_hash in extraction_cache:
+            cached_by_idx[i] = extraction_cache[pkg_hash]
+        else:
+            to_extract.append((i, email_data))
+
+    n_cached = len(cached_by_idx)
+    if not to_extract:
+        if on_progress and total:
+            await on_progress(
+                "layer1", f"{total} {_plural(total, 'email')} — all cached"
+            )
+        return [cached_by_idx[i] for i in range(total)]
+
     if on_progress:
-        await on_progress("layer1", f"Extracting {total} emails in parallel...")
+        suffix = f" ({n_cached} cached)" if n_cached else ""
+        await on_progress(
+            "layer1",
+            f"Extracting {len(to_extract)} "
+            f"{_plural(len(to_extract), 'email')}{suffix}...",
+        )
+
+    done = 0
 
     async def _extract_one(idx, email_data):
+        nonlocal done
         email_id = email_data.get("_id", "?")
         att_texts = attachment_texts_by_email.get(email_id)
-        return await extract_email(
+        result = await extract_email(
             email_data, att_texts, field_registry,
             openai_client, extraction_cache,
         )
+        done += 1
+        if on_progress:
+            # Counts only — no subject, no _id. The terminal collapses
+            # same-stage events into one line, so any per-item label would
+            # leave whichever email finished last sitting on screen as if it
+            # were the only one. Ids are meaningless to a reader anyway
+            # ("e038", or "new_1712..." for a user-added email), and subjects
+            # are long enough to need truncating mid-word.
+            await on_progress(
+                "layer1",
+                f"Extracting {done}/{len(to_extract)} "
+                f"{_plural(len(to_extract), 'email')}...",
+            )
+        return idx, result
 
-    results = await asyncio.gather(*[
-        _extract_one(i, email) for i, email in enumerate(email_dataset)
+    extracted = await asyncio.gather(*[
+        _extract_one(i, email) for i, email in to_extract
     ])
 
+    # Settle on a stage summary — the line that persists once done.
     if on_progress:
-        await on_progress("layer1", f"Extracted {total} emails")
+        suffix = f" ({n_cached} cached)" if n_cached else ""
+        await on_progress(
+            "layer1",
+            f"Extracted {len(to_extract)} "
+            f"{_plural(len(to_extract), 'email')}{suffix}",
+        )
 
-    return list(results)
+    by_idx = dict(cached_by_idx)
+    for idx, result in extracted:
+        by_idx[idx] = result
+    return [by_idx[i] for i in range(total)]
