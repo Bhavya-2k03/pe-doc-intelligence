@@ -9,6 +9,7 @@ Layer 5: Timeline Execution (engine)
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import os
@@ -49,7 +50,10 @@ EXTRACTION_TO_REGISTRY_MAP: dict[str, str] = {
     "fund_total_paid_in_capital": "fund_total_paid_in_capital",
     "investment_period_end_date": "fund_investment_end_date",
     "fund_term_expiration_date": "fund_term_end_date",
-    "total_fund_committed_capital": "total_fund_commitment",
+    # Capital commitments are deliberately absent (see constants.py). Dropping
+    # them here as well as from the extraction registry makes the guarantee
+    # structural: even if the LLM emits a commitment field, it has nowhere to
+    # land and cannot overwrite the contractual value from the LPA seed.
     "investor_invested_capital": "investor_invested_capital",
     "investor_total_realized_capital": "investor_realized_amount",
     "investor_percentage_realized": "investor_percentage_realized",
@@ -256,6 +260,136 @@ def _safe_parse_date(s: str | None) -> date | None:
         return None
 
 
+def _is_known_as_of(ctx: ClauseWithContext, evaluation_date: date) -> bool:
+    """True if this clause's document is dated on or before evaluation_date.
+
+    A clause from a later-dated document is not yet knowable at
+    evaluation_date. An unparseable or missing document date is treated as
+    knowable (fail-open), matching how the timelines handle it — an
+    undated clause is included rather than silently dropped.
+    """
+    doc_date = _safe_parse_date((ctx.resolved_document_date or "").split("T")[0])
+    return doc_date is None or doc_date <= evaluation_date
+
+
+def _condition_cache_text(raw_condition: str, src_email_date: str) -> str:
+    """Text used both as the LLM input and the condition-cache key.
+
+    Built in one place because the prefetch pass and the insertion pass must
+    derive byte-identical keys — any divergence would turn every prefetched
+    result into a cache miss and silently restore the sequential LLM calls.
+    """
+    if src_email_date:
+        return f"{raw_condition} (document signed {src_email_date})"
+    return raw_condition
+
+
+def _iter_insertable_entries(
+    extraction_results: list[ExtractionResult],
+    evaluation_date: date,
+    email_dates: dict[str, str],
+):
+    """Yield (field_name, registry_name, entry) for in-scope extracted entries.
+
+    Shared by the prefetch and insertion passes so the two cannot disagree
+    about which entries matter: prefetching a superset wastes LLM calls,
+    prefetching a subset reintroduces the sequential ones.
+    """
+    for result in extraction_results:
+        for field_name, entries in result.extracted_fields.items():
+            registry_name = EXTRACTION_TO_REGISTRY_MAP.get(field_name)
+            if registry_name is None:
+                continue
+
+            for entry in entries:
+                if (entry.doc_type in SKIP_DOC_TYPES
+                        and registry_name not in FIELDS_ALLOWED_FROM_SKIP_DOCS):
+                    continue
+
+                # A document that has not been received by evaluation_date is
+                # not knowable, so nothing it reports may enter the timeline —
+                # including figures for periods that already closed. Mirrors
+                # the clause-side rule in _recompute_ordering_and_filter.
+                # Checked before condition resolution so a future document
+                # costs no LLM calls. Missing email date → fail open.
+                source_doc_date = _safe_parse_date(
+                    email_dates.get(entry.email_source_id, "")
+                )
+                if source_doc_date is not None and source_doc_date > evaluation_date:
+                    continue
+
+                yield field_name, registry_name, entry
+
+
+async def _prefetch_date_conditions(
+    extraction_results: list[ExtractionResult],
+    evaluation_date: date,
+    email_dates: dict[str, str],
+    openai_client: Any,
+    cache: dict,
+    on_progress: Any = None,
+) -> None:
+    """Resolve every outstanding value_as_of_condition concurrently.
+
+    Period-column tables report figures against period labels ("Q1 2027")
+    rather than dates, because a fund's fiscal quarters are anchored to its
+    initial closing and must not be guessed by the model. Each label costs an
+    LLM round-trip, and resolving them one at a time inside the insertion loop
+    made a 4-figure statement take ~11s.
+
+    Only the text→AST call is parallelized. Evaluating the AST still happens
+    in the insertion pass, in order, because that reads the timelines being
+    built. This function only warms `cache`; the insertion pass is unchanged
+    and simply finds every lookup already present.
+    """
+    if openai_client is None:
+        return
+
+    # Deduplicate by cache key: two entries with the same condition text cost
+    # one call, not two.
+    to_resolve: dict[str, str] = {}
+    for _field_name, _registry_name, entry in _iter_insertable_entries(
+        extraction_results, evaluation_date, email_dates
+    ):
+        if _safe_parse_date(entry.value_as_of_date) is not None:
+            continue
+        if not entry.value_as_of_condition:
+            continue
+        text = _condition_cache_text(
+            entry.value_as_of_condition,
+            email_dates.get(entry.email_source_id, ""),
+        )
+        cond_hash = hashlib.sha256(text.encode()).hexdigest()
+        if cond_hash not in cache:
+            to_resolve[cond_hash] = text
+
+    if not to_resolve:
+        return
+
+    if on_progress:
+        n = len(to_resolve)
+        await on_progress(
+            "layer3",
+            f"Resolving {n} period reference{'s' if n != 1 else ''} "
+            f"to fund-anchored dates...",
+        )
+
+    async def _resolve(cond_hash: str, text: str):
+        try:
+            return cond_hash, await resolve_date_condition(text, openai_client)
+        except Exception:
+            # Left uncached so the insertion pass retries it once and applies
+            # its existing drop-the-entry handling on failure.
+            logger.exception("Failed to prefetch value_as_of_condition: %s", text)
+            return cond_hash, None
+
+    for cond_hash, resolved in await asyncio.gather(
+        *[_resolve(h, t) for h, t in to_resolve.items()]
+    ):
+        if resolved is not None:
+            cache[cond_hash] = resolved
+
+
 async def insert_extracted_fields(
     timelines: dict[str, FieldTimeline],
     extraction_results: list[ExtractionResult],
@@ -263,6 +397,7 @@ async def insert_extracted_fields(
     openai_client: Any = None,
     condition_cache: dict | None = None,
     email_dates: dict[str, str] | None = None,
+    on_progress: Any = None,
 ) -> None:
     """Insert extracted field values into timelines as SET entries.
 
@@ -271,75 +406,88 @@ async def insert_extracted_fields(
     and correctly override earlier ones via value_at().
     """
     _email_dates = email_dates or {}
+    _cache = condition_cache if condition_cache is not None else {}
+
+    # Warm the condition cache in one parallel batch so the loop below never
+    # blocks on an LLM call.
+    await _prefetch_date_conditions(
+        extraction_results, evaluation_date, _email_dates,
+        openai_client, _cache, on_progress,
+    )
 
     # Phase 1: Collect and resolve all entries with their dates
-    # Key = registry_name, Value = list of (date, value, source_text, email_source_id)
-    pending: dict[str, list[tuple[date, Any, str, str | None]]] = {}
+    # Key = registry_name,
+    # Value = list of (date, value, source_text, email_source_id, as_of_label)
+    pending: dict[str, list[tuple[date, Any, str, str | None, str | None]]] = {}
 
-    for result in extraction_results:
-        for field_name, entries in result.extracted_fields.items():
-            registry_name = EXTRACTION_TO_REGISTRY_MAP.get(field_name)
-            if registry_name is None:
-                continue
+    for field_name, registry_name, entry in _iter_insertable_entries(
+        extraction_results, evaluation_date, _email_dates
+    ):
+        # Determine entry date — prefer explicit date, then resolve condition via LLM
+        entry_date = _safe_parse_date(entry.value_as_of_date)
 
-            for entry in entries:
-                if entry.doc_type in SKIP_DOC_TYPES and registry_name not in FIELDS_ALLOWED_FROM_SKIP_DOCS:
-                    continue
+        if entry_date is None and entry.value_as_of_condition and openai_client:
+            raw_cond = entry.value_as_of_condition
+            src_email_date = _email_dates.get(entry.email_source_id, "")
+            condition_text = _condition_cache_text(raw_cond, src_email_date)
+            cache = _cache
+            cond_hash = hashlib.sha256(condition_text.encode()).hexdigest()
 
-                # Determine entry date — prefer explicit date, then resolve condition via LLM
-                entry_date = _safe_parse_date(entry.value_as_of_date)
+            if cond_hash in cache:
+                # Normally warmed by _prefetch_date_conditions above.
+                output_type, ast_node = cache[cond_hash]
+            else:
+                try:
+                    output_type, ast_node = await resolve_date_condition(
+                        condition_text, openai_client,
+                    )
+                    cache[cond_hash] = (output_type, ast_node)
+                except Exception:
+                    logger.exception(
+                        "Failed to resolve value_as_of_condition: %s",
+                        raw_cond,
+                    )
+                    ast_node = None
+                    output_type = None
 
-                if entry_date is None and entry.value_as_of_condition and openai_client:
-                    raw_cond = entry.value_as_of_condition
-                    src_email_date = _email_dates.get(entry.email_source_id, "")
-                    if src_email_date:
-                        condition_text = f"{raw_cond} (document signed {src_email_date})"
-                    else:
-                        condition_text = raw_cond
-                    cache = condition_cache if condition_cache is not None else {}
-                    cond_hash = hashlib.sha256(condition_text.encode()).hexdigest()
-
-                    if cond_hash in cache:
-                        output_type, ast_node = cache[cond_hash]
-                    else:
-                        try:
-                            output_type, ast_node = await resolve_date_condition(
-                                condition_text, openai_client,
-                            )
-                            cache[cond_hash] = (output_type, ast_node)
-                        except Exception:
-                            logger.exception(
-                                "Failed to resolve value_as_of_condition: %s",
-                                raw_cond,
-                            )
-                            ast_node = None
-                            output_type = None
-
-                    if output_type == "date" and ast_node is not None:
-                        doc_date = _safe_parse_date(src_email_date)
-                        temp_ctx = EvaluationContext(
-                            evaluation_date=evaluation_date,
-                            document_date=doc_date,
-                        )
-                        resolved = evaluate_ast(ast_node, timelines, temp_ctx)
-                        if resolved is not None:
-                            entry_date = (
-                                resolved if isinstance(resolved, date)
-                                else _safe_parse_date(str(resolved))
-                            )
-
-                if entry_date is not None and entry_date > evaluation_date:
-                    continue
-
-                if entry_date is None:
-                    entry_date = evaluation_date
-
-                source_text = f"Extracted: {entry.source_context or field_name}"
-                if registry_name not in pending:
-                    pending[registry_name] = []
-                pending[registry_name].append(
-                    (entry_date, entry.value, source_text, entry.email_source_id)
+            if output_type == "date" and ast_node is not None:
+                doc_date = _safe_parse_date(src_email_date)
+                temp_ctx = EvaluationContext(
+                    evaluation_date=evaluation_date,
+                    document_date=doc_date,
                 )
+                resolved = evaluate_ast(ast_node, timelines, temp_ctx)
+                if resolved is not None:
+                    entry_date = (
+                        resolved if isinstance(resolved, date)
+                        else _safe_parse_date(str(resolved))
+                    )
+
+        if entry_date is not None and entry_date > evaluation_date:
+            continue
+
+        if entry_date is None and entry.value_as_of_condition:
+            # The entry carries a temporal condition that could not be
+            # resolved to a date. Dating it at evaluation_date would
+            # let a stale prior-period value land LAST in insertion
+            # order and override the true current value. Drop it.
+            logger.warning(
+                "Dropping %s entry (value=%r): unresolvable as-of "
+                "condition %r",
+                field_name, entry.value, entry.value_as_of_condition,
+            )
+            continue
+
+        if entry_date is None:
+            entry_date = evaluation_date
+
+        source_text = f"Extracted: {entry.source_context or field_name}"
+        if registry_name not in pending:
+            pending[registry_name] = []
+        pending[registry_name].append(
+            (entry_date, entry.value, source_text, entry.email_source_id,
+             entry.value_as_of_condition)
+        )
 
     # Phase 2: Sort by date and insert in chronological order.
     # This ensures later data points get higher insertion_order and
@@ -350,13 +498,18 @@ async def insert_extracted_fields(
         if registry_name not in timelines:
             timelines[registry_name] = FieldTimeline()
 
-        for entry_date, value, source_text, email_source_id in field_entries:
+        for entry_date, value, source_text, email_source_id, as_of_label in field_entries:
             timelines[registry_name].insert_entry(TimelineEntry(
                 date=entry_date,
                 value=value,
                 source_clause_text=source_text,
                 entry_type="SET",
                 email_source_id=email_source_id,
+                # Everything this function builds came from a document
+                # reporting a measured value — that is what makes it an
+                # observation, not the field it happens to be.
+                is_observation=True,
+                as_of_label=as_of_label,
             ))
 
 
@@ -1055,7 +1208,21 @@ async def _evaluate_inner(
         else:
             _trace(f"    Instructions: None (failed)")
 
-    await _progress("layer2", f"Interpreted {total_clauses} clauses")
+    # Settle line must state the cache status itself: the terminal collapses
+    # same-stage events, so the "all cached" message emitted above is already
+    # overwritten by the time this one lands.
+    _n_cached_clauses = total_clauses - len(uncached)
+    _clause_noun = "clause" if total_clauses == 1 else "clauses"
+    if total_clauses and _n_cached_clauses == total_clauses:
+        await _progress(
+            "layer2", f"{total_clauses} {_clause_noun} — all cached"
+        )
+    else:
+        _suffix = f" ({_n_cached_clauses} cached)" if _n_cached_clauses else ""
+        await _progress(
+            "layer2",
+            f"Interpreted {total_clauses} {_clause_noun}{_suffix}",
+        )
 
     # ── Build intents lookup (constant across passes) ─────────────────
     # Each intent is paired with its source email date for temporal filtering
@@ -1080,6 +1247,7 @@ async def _evaluate_inner(
     await insert_extracted_fields(
         timelines, extraction_results, evaluation_date,
         openai_client, session.condition_cache, email_dates_by_id,
+        on_progress=_progress,
     )
 
     _trace(f"\n{'='*80}")
@@ -1100,6 +1268,11 @@ async def _evaluate_inner(
     contexts = await resolve_document_dates(
         contexts, timelines, evaluation_date,
         openai_client, session.condition_cache,
+    )
+
+    await _progress(
+        "layer3",
+        f"Resolved {len(contexts)} document date{'s' if len(contexts) != 1 else ''}",
     )
 
     for ctx in contexts:
@@ -1126,6 +1299,11 @@ async def _evaluate_inner(
         openai_client, session.condition_cache,
     )
 
+    _n_confirmed = sum(1 for c in contexts if c.is_confirmed)
+    await _progress(
+        "layer4", f"Confirmed {_n_confirmed} of {len(contexts)} clauses",
+    )
+
     _trace(f"\n  Results:")
     for ctx in contexts:
         _trace(f"  confirmed={ctx.is_confirmed} date={ctx.resolved_document_date} | {ctx.clause_text}")
@@ -1147,6 +1325,11 @@ async def _evaluate_inner(
 
     _adjust_seed_for_structural_dates(timelines, evaluation_date)
     _execute_clauses(executable, timelines, evaluation_date)
+    await _progress(
+        "layer5",
+        f"Executed {len(executable)} clause"
+        f"{'s' if len(executable) != 1 else ''}",
+    )
 
     _trace(f"\n--- Timelines after execution ---")
     for fname, ft in timelines.items():
@@ -1532,6 +1715,12 @@ async def _evaluate_inner(
                 "source": winner.source_clause_text if winner else "",
                 "email_source_id": winner.email_source_id if winner else None,
                 "clause_id": winner.clause_id if winner else None,
+                # A reported measurement vs. a value set by a clause — the UI
+                # words the date range differently for each.
+                "is_observation": bool(winner.is_observation) if winner else False,
+                # Period label this observation was reported under, when the
+                # document gave one instead of an explicit date.
+                "as_of_label": winner.as_of_label if winner else None,
             }
             # When a constraint changes the effective value, include both
             if raw_value != val:
@@ -1556,9 +1745,18 @@ async def _evaluate_inner(
             for c in ft.constraints
         ]
 
+    # Clause dispositions are an "as of evaluation_date" view, same rule the
+    # timelines follow: a clause from a document dated after the evaluation
+    # date is not yet knowable, so it is excluded here for the same reason its
+    # values are kept off the timelines. Confirmation state is deliberately NOT
+    # part of this filter — an unconfirmed clause still belongs in these lists,
+    # it just has not taken effect.
+    as_of_contexts = [c for c in contexts if _is_known_as_of(c, evaluation_date)]
+
     manual_review_items: list[dict] = []
+    no_action_items: list[dict] = []
     unconfirmed_docs: list[dict] = []
-    for ctx_item in contexts:
+    for ctx_item in as_of_contexts:
         if ctx_item.interpreter_output:
             for instr in ctx_item.interpreter_output:
                 if instr.action == "MANUAL_REVIEW":
@@ -1566,6 +1764,15 @@ async def _evaluate_inner(
                         "clause_text": instr.clause_text,
                         "reason": instr.manual_review_reason,
                         "affected_field": instr.affected_field,
+                    })
+                elif instr.action == "NO_ACTION":
+                    # Surfaced so a reviewer can see the system read the
+                    # clause and concluded it changes nothing — a silent
+                    # drop is indistinguishable from a missed clause.
+                    no_action_items.append({
+                        "clause_text": instr.clause_text,
+                        "reason": instr.no_action_reason,
+                        "email_source_id": ctx_item.email_source_id,
                     })
         if not ctx_item.is_confirmed:
             unconfirmed_docs.append({
@@ -1606,13 +1813,17 @@ async def _evaluate_inner(
             "where the condition is met.",
         ],
         "manual_review_items": manual_review_items,
+        "no_action_items": no_action_items,
         "unconfirmed_documents": unconfirmed_docs,
         "stats": {
+            # All counts are "as of evaluation_date" so they agree with the
+            # lists above; total_clauses is the raw extraction count.
             "total_clauses": len(contexts),
             "executed_clauses": len(executable),
-            "confirmed": sum(1 for c in contexts if c.is_confirmed),
-            "unconfirmed": sum(1 for c in contexts if not c.is_confirmed),
+            "confirmed": sum(1 for c in as_of_contexts if c.is_confirmed),
+            "unconfirmed": sum(1 for c in as_of_contexts if not c.is_confirmed),
             "manual_review": len(manual_review_items),
+            "no_action": len(no_action_items),
         },
     }
 
