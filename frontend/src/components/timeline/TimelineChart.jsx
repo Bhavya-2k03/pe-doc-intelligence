@@ -207,18 +207,26 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
       // The fit is MEASURED, not estimated from character count: an estimate
       // that is even slightly pessimistic pushes short labels like "$7.4M"
       // out of bars they comfortably fit in.
-      const inside = g.append('text')
-        .attr('x', s + ew / 2).attr('y', barH / 2).attr('dy', '0.35em')
-        .attr('text-anchor', 'middle').attr('fill', '#06070b')
-        .attr('font-size', '11px').attr('font-weight', '700')
-        .attr('font-family', 'JetBrains Mono, monospace')
-        .attr('pointer-events', 'none').text(label);
-
+      // Step the size down before giving up on an inside fit. Otherwise a
+      // six-character value like "$2.05M" hops above a bar whose
+      // five-character neighbours ("$1.9M", "$2.2M") sit inside — the row
+      // loses its rhythm and the odd one out looks like a glitch, for a
+      // reason the viewer cannot see. 9px is already the size used for
+      // labels above the bar, so it is a size we know reads cleanly.
       // 2px of breathing room per side; anything tighter reads as touching.
-      const insideW = inside.node().getComputedTextLength();
+      let inside = null;
+      for (const size of [11, 10, 9]) {
+        const t = g.append('text')
+          .attr('x', s + ew / 2).attr('y', barH / 2).attr('dy', '0.35em')
+          .attr('text-anchor', 'middle').attr('fill', '#06070b')
+          .attr('font-size', `${size}px`).attr('font-weight', '700')
+          .attr('font-family', 'JetBrains Mono, monospace')
+          .attr('pointer-events', 'none').text(label);
+        if (t.node().getComputedTextLength() <= ew - 4) { inside = t; break; }
+        t.remove();
+      }
 
-      if (insideW > ew - 4) {
-        inside.remove();
+      if (!inside) {
         // Above the bar, so the bar's width does not constrain it — only the
         // chart's does. Bounded by the plot width so a long value can never
         // push past the axis.
