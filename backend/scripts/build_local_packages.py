@@ -77,9 +77,50 @@ ATTACHMENT_ONLY_OVERRIDES = {
 PACKAGES = ["mfn_flow", "side_letter_flow", "multi_amendment"]
 
 
+async def _fetch_from_db(package: str) -> list[dict]:
+    """Read a package from the database, bypassing the local override.
+
+    main.fetch_seed_emails() consults local_packages/ first, so calling it
+    here would make this script read its own previous output instead of the
+    database — the JSONs would ossify and never pick up DB changes.
+    """
+    import os
+    from main import _fetch_seed_emails_postgres, _fetch_seed_emails_sqlite, SEED_DB_PATH
+
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return await _fetch_seed_emails_postgres(database_url, package)
+    return _fetch_seed_emails_sqlite(SEED_DB_PATH, package)
+
+
+def _localize_attachments(email: dict, missing: list[str]) -> None:
+    """Point every attachment at a file in local_packages/files/.
+
+    A local package must not reference database file_ids. push_packages.py
+    replaces attachments delete-then-insert, so every push mints new ids and
+    any id captured here dies silently — the PDF fails to load, its clauses
+    are never extracted, and the scenario produces a plausible but wrong
+    answer. Copies the PDF from backend/files/ when it is not already local.
+    """
+    for att in email.get("attachments") or []:
+        fid = att.get("file_id") or ""
+        if fid.startswith("local::"):
+            continue
+        name = att.get("name")
+        if not name:
+            continue
+        dest = FILES_DIR / name
+        if not dest.exists():
+            src = BACKEND / "files" / name
+            if not src.exists():
+                missing.append(name)
+                continue
+            shutil.copy2(src, dest)
+        att["file_id"] = f"local::{name}"
+
+
 async def main():
     # Import from main AFTER load_dotenv so DATABASE_URL is picked up.
-    from main import fetch_seed_emails
 
     LOCAL_DIR.mkdir(exist_ok=True)
     FILES_DIR.mkdir(parents=True, exist_ok=True)
@@ -103,8 +144,10 @@ async def main():
             print(f"  {m}")
         sys.exit(1)
 
+    unresolved: list[str] = []
+
     for package in PACKAGES:
-        emails = await fetch_seed_emails(package)
+        emails = await _fetch_from_db(package)
         if not emails:
             print(f"[warn] package {package!r} returned no emails — skipped")
             continue
@@ -133,6 +176,8 @@ async def main():
                 {k: att.get(k) for k in ("file_id", "name", "attachment_index")}
                 for att in e.get("attachments", [])
             ]
+            # Every attachment must resolve from disk, not from a DB id.
+            _localize_attachments(e, unresolved)
             out_emails.append(e)
 
         out_path = LOCAL_DIR / f"{package}.json"
@@ -141,6 +186,12 @@ async def main():
         n_repl = [e["_id"] for e in out_emails if e["_id"] in REPLACEMENTS]
         print(f"Wrote {out_path.name}: {len(out_emails)} emails, "
               f"replaced {n_repl}")
+
+    if unresolved:
+        print("\nWARNING — these PDFs are in no local source, so their emails "
+              "will silently lose their attachments:")
+        for name in sorted(set(unresolved)):
+            print(f"  {name}")
 
 
 if __name__ == "__main__":
