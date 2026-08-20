@@ -203,18 +203,22 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
 
       const label = fmtVal(e.value, fieldName);
 
-      // Inside the bar when the whole label fits there, otherwise above it,
-      // where there is room and collision handling. Never truncated to a
-      // fixed character count — a wide bar shows its value in full.
-      const fitsInside = label.length * 11 * MONO_CHAR_W <= ew - 10;
+      // Inside the bar when the label actually fits, otherwise above it.
+      // The fit is MEASURED, not estimated from character count: an estimate
+      // that is even slightly pessimistic pushes short labels like "$7.4M"
+      // out of bars they comfortably fit in.
+      const inside = g.append('text')
+        .attr('x', s + ew / 2).attr('y', barH / 2).attr('dy', '0.35em')
+        .attr('text-anchor', 'middle').attr('fill', '#06070b')
+        .attr('font-size', '11px').attr('font-weight', '700')
+        .attr('font-family', 'JetBrains Mono, monospace')
+        .attr('pointer-events', 'none').text(label);
 
-      if (fitsInside) {
-        g.append('text').attr('x', s + ew / 2).attr('y', barH / 2).attr('dy', '0.35em')
-          .attr('text-anchor', 'middle').attr('fill', '#06070b')
-          .attr('font-size', '11px').attr('font-weight', '700')
-          .attr('font-family', 'JetBrains Mono, monospace')
-          .attr('pointer-events', 'none').text(label);
-      } else {
+      // 2px of breathing room per side; anything tighter reads as touching.
+      const insideW = inside.node().getComputedTextLength();
+
+      if (insideW > ew - 4) {
+        inside.remove();
         // Above the bar, so the bar's width does not constrain it — only the
         // chart's does. Bounded by the plot width so a long value can never
         // push past the axis.
