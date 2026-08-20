@@ -33,7 +33,22 @@ function fmtNumber(v, fieldName) {
 function fmtVal(v, fieldName) {
   if (v == null) return '\u2014';
   if (typeof v === 'number') return fmtNumber(v, fieldName);
-  return String(v).length > 16 ? String(v).slice(0, 14) + '\u2026' : String(v);
+  // Returned in full. Fitting to the space available is the caller's job \u2014
+  // a fixed character cap clipped values like "committed_capital" even on a
+  // bar hundreds of pixels wide.
+  return String(v);
+}
+
+// Approximate advance width of JetBrains Mono, used to decide whether a label
+// fits inside its bar. Monospace, so character count times this is accurate
+// enough to avoid measuring text in the DOM.
+const MONO_CHAR_W = 0.6;
+
+function fitToWidth(label, pxAvailable, fontPx) {
+  const maxChars = Math.floor(pxAvailable / (fontPx * MONO_CHAR_W));
+  if (label.length <= maxChars) return label;
+  if (maxChars < 2) return '';
+  return label.slice(0, maxChars - 1) + '\u2026';
 }
 
 // Exact, unabbreviated \u2014 used where there is room to show the true number.
@@ -188,16 +203,25 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
 
       const label = fmtVal(e.value, fieldName);
 
-      if (ew > 30) {
+      // Inside the bar when the whole label fits there, otherwise above it,
+      // where there is room and collision handling. Never truncated to a
+      // fixed character count — a wide bar shows its value in full.
+      const fitsInside = label.length * 11 * MONO_CHAR_W <= ew - 10;
+
+      if (fitsInside) {
         g.append('text').attr('x', s + ew / 2).attr('y', barH / 2).attr('dy', '0.35em')
           .attr('text-anchor', 'middle').attr('fill', '#06070b')
           .attr('font-size', '11px').attr('font-weight', '700')
           .attr('font-family', 'JetBrains Mono, monospace')
           .attr('pointer-events', 'none').text(label);
       } else {
-        // ~5.6px per char at 9px monospace, plus a 4px gutter between labels
-        const halfW = (label.length * 5.6) / 2;
-        const cx = s + ew / 2;
+        // Above the bar, so the bar's width does not constrain it — only the
+        // chart's does. Bounded by the plot width so a long value can never
+        // push past the axis.
+        const above = fitToWidth(label, iw, 9);
+        const halfW = (above.length * 9 * MONO_CHAR_W) / 2;
+        // Keep the label inside the plot even when its bar sits at an edge.
+        const cx = Math.min(Math.max(s + ew / 2, halfW), Math.max(iw - halfW, halfW));
         const x0 = cx - halfW;
         const x1 = cx + halfW;
 
@@ -213,7 +237,7 @@ export default function TimelineChart({ entries, fieldName, constraints = [], gl
             .attr('text-anchor', 'middle').attr('fill', c)
             .attr('font-size', '9px').attr('font-weight', '700')
             .attr('font-family', 'JetBrains Mono, monospace')
-            .attr('pointer-events', 'none').text(label);
+            .attr('pointer-events', 'none').text(above);
         }
       }
     });
