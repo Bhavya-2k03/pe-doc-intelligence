@@ -136,6 +136,86 @@ def _parse_iso_date(value: str | None) -> date | None:
         return None
 
 
+async def resolve_attachments(
+    emails: list[dict],
+    session: Any,
+    on_progress: Any = None,
+) -> list[dict]:
+    """Resolve every attachment's bytes, returning them in document order.
+
+    Two sources, handled differently:
+      * Seed attachments carry a file_id and live in Postgres. They are cached
+        on the session by file_id and the misses are fetched concurrently.
+        Caching is sound because file_id is immutable by construction —
+        push_packages.py replaces attachments delete-then-insert, so changed
+        bytes always get a new file_id.
+      * User-uploaded attachments carry inline base64 and no file_id. They are
+        decoded every time (an edited upload must take effect immediately) and
+        never touch the database or the cache.
+
+    Order is preserved: parse_attachments zips its results against this list.
+    Attachments whose bytes cannot be resolved are omitted, matching the
+    previous behaviour.
+    """
+    pending: list[dict] = []
+    for email in emails:
+        email_id = email.get("_id", "")
+        for att in email.get("attachments", []):
+            pending.append({
+                "email_id": email_id,
+                "name": att.get("name", ""),
+                "attachment_index": att.get("attachment_index", 0),
+                "file_id": att.get("file_id"),
+                "file_data": att.get("file_data"),
+            })
+
+    # Deduplicated so two emails sharing a file_id cost one query.
+    missing_ids: list[str] = []
+    for p in pending:
+        fid = p["file_id"]
+        if fid and fid not in session.attachment_cache and fid not in missing_ids:
+            missing_ids.append(fid)
+
+    if missing_ids:
+        if on_progress:
+            await on_progress(
+                "parsing",
+                f"Fetching {len(missing_ids)} attachment"
+                f"{'s' if len(missing_ids) != 1 else ''}...",
+            )
+        fetched = await asyncio.gather(
+            *[fetch_attachment_bytes(fid) for fid in missing_ids]
+        )
+        for fid, data in zip(missing_ids, fetched):
+            if data is not None:
+                session.attachment_cache[fid] = data
+            else:
+                logger.warning("Attachment bytes not found for file_id %s", fid)
+
+    resolved: list[dict] = []
+    for p in pending:
+        file_bytes: bytes | None = None
+        if p["file_id"]:
+            file_bytes = session.attachment_cache.get(p["file_id"])
+        elif p["file_data"]:
+            try:
+                file_bytes = base64.b64decode(p["file_data"])
+            except Exception:
+                logger.warning(
+                    "Undecodable inline attachment %r on email %s",
+                    p["name"], p["email_id"],
+                )
+
+        if file_bytes is not None:
+            resolved.append({
+                "email_id": p["email_id"],
+                "name": p["name"],
+                "attachment_index": p["attachment_index"],
+                "file_bytes": file_bytes,
+            })
+    return resolved
+
+
 def _fetch_seed_emails_local(package: str) -> list[dict] | None:
     """Return a local package definition if one exists, else None."""
     path = os.path.join(LOCAL_PACKAGES_DIR, f"{package}.json")
@@ -504,33 +584,12 @@ async def session_evaluate(session_id: str, body: EvaluateRequest):
             await on_progress("parsing", "Resolving attachments...")
             attachment_texts_by_email: dict[str, list[dict]] = {}
 
-            # Collect all attachments across all emails
-            all_attachments: list[dict] = []  # each has email_id + file info
-            for email in in_scope_emails:
-                email_id = email.get("_id", "")
-                attachments = email.get("attachments", [])
-                for att in attachments:
-                    file_id = att.get("file_id")
-                    file_data = att.get("file_data")
-                    att_name = att.get("name", "")
-                    att_index = att.get("attachment_index", 0)
-                    file_bytes: bytes | None = None
-
-                    if file_id:
-                        file_bytes = await fetch_attachment_bytes(file_id)
-                    elif file_data:
-                        try:
-                            file_bytes = base64.b64decode(file_data)
-                        except Exception:
-                            pass
-
-                    if file_bytes is not None:
-                        all_attachments.append({
-                            "email_id": email_id,
-                            "name": att_name,
-                            "attachment_index": att_index,
-                            "file_bytes": file_bytes,
-                        })
+            # Seed attachments were previously re-fetched from Postgres on
+            # every evaluation, one at a time — ~7s of a 7.5s warm re-run,
+            # spent before any other cache could be consulted.
+            all_attachments = await resolve_attachments(
+                in_scope_emails, session, on_progress,
+            )
 
             # Parse all PDFs in one parallel batch
             if all_attachments:

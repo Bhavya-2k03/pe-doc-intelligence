@@ -120,6 +120,15 @@ class SessionState:
         self.interpreter_cache: dict[str, list[ClauseInstruction]] = {}
         self.condition_cache: dict[str, tuple[str, Any]] = {}  # hash -> (output_type, ASTNode)
         self.parse_cache: dict[str, list[str]] = {}  # pdf_bytes_hash -> parsed pages
+        # file_id -> raw PDF bytes. Safe to cache because file_id is immutable
+        # by construction: push_packages.py replaces attachments delete-then-
+        # insert, so changed bytes always get a NEW file_id. Without this the
+        # bytes were re-fetched from Postgres on every evaluation, before any
+        # other cache could be consulted (parse_cache is keyed by a hash OF
+        # the bytes, so it cannot help until they are already in hand).
+        # User-uploaded attachments arrive inline as base64 and never enter
+        # this cache — they have no file_id.
+        self.attachment_cache: dict[str, bytes] = {}
         self.timelines: Optional[dict[str, FieldTimeline]] = None
         self.evaluation_date: Optional[date] = None
         self.last_accessed: float = time.time()
