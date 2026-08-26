@@ -148,7 +148,7 @@ const SCENARIO_INFO = {
     ],
   },
   multi_amendment: {
-    title: 'Multi-Amendment Scenario',
+    title: 'Investment Period Extension',
     description: 'Documents issued years apart: a fee cap side letter, a mid-life GP fee accommodation tied to the Investment Period end, and a later Investment Period extension. The extension silently stretches the waiver window, worth material additional savings a human reader could easily miss.',
     lookFor: [
       'Fee timeline shows three phases: 2% baseline, 1% waiver, capped post-IP rate',

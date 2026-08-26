@@ -17,7 +17,7 @@ const PACKAGES = [
   },
   {
     id: 'multi_amendment',
-    title: 'Multi-Amendment',
+    title: 'Investment Period Extension',
     icon: Layers,
     emails: 4,
     description: 'Three documents spanning years, where a later extension silently stretches an earlier fee waiver. Shows hidden cross-document linkages the system catches.',
