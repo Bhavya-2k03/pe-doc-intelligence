@@ -4,6 +4,10 @@ import { ArrowRight, FileSearch, Brain, CheckCircle2, ChevronRight, Zap } from '
 import { ProblemFigure, ExtractFigure, InterpretFigure, VerifyFigure } from '../components/landing/Illustrations';
 import { HeroScanGrid, SectionLabel, PipelineThread, StatBaseline } from '../components/landing/Premium';
 
+/* ── Contact ───────────────────────────────────────────────────────────── */
+const LINKEDIN_URL = 'https://www.linkedin.com/in/bhavya2k03/';
+const CONTACT_EMAIL = 'bhavya.2k03@gmail.com';
+
 /* ── Terminal mockup ───────────────────────────────────────────────────── */
 function TerminalDemo() {
   const lines = [
@@ -63,7 +67,7 @@ export default function Landing() {
           : 'bg-[#0a0a0f]/40 border-b border-transparent'
         }`}>
         <div className="max-w-[1080px] mx-auto px-6 h-14 flex items-center justify-between">
-          <span className="text-[15px] font-semibold text-white">PE Doc <span className="text-cyan-500">Intelligence</span></span>
+          <span className="text-[18px] font-semibold text-white tracking-tight">true<span className="text-cyan-500">fee</span></span>
           <button onClick={() => navigate('/demo')}
             className="h-8 px-4 bg-white text-[#0a0a0f] text-[13px] font-medium rounded-md
               hover:bg-slate-200 transition active:scale-[0.97]">
@@ -126,7 +130,8 @@ export default function Landing() {
               but only after the GP confirms it. A fee cap kicks in next fiscal quarter.
               An amendment extends the investment period, which shifts when the rate steps down.
               Now compute the exact management fee for Q3 2027. That is the problem your
-              spreadsheets solve slowly and your portfolio systems do not solve at all.
+              spreadsheets solve slowly, and that portfolio systems were never
+              designed to solve.
             </p>
           </div>
           {/* Right: isometric illustration */}
@@ -167,7 +172,7 @@ export default function Landing() {
               <StatBaseline active={true} duration={1200} />
               <div className="text-[13px] text-slate-400 mt-3 leading-relaxed">
                 Industry-wide standard for how GPs <em>report</em> management
-                fees. It standardized the format — not whether the underlying
+                fees. It standardized the format, not whether the underlying
                 number is correct. Verification is still the LP's job.
               </div>
             </div>
@@ -327,6 +332,11 @@ export default function Landing() {
               (portfolio-company ledgers, NAV feeds, distribution history)
               and are tracked as V2.
             </p>
+            <p className="text-[14px] text-slate-500 leading-relaxed mt-4">
+              This is a working prototype rather than a commercial product,
+              built solo over about four months. Everything described here runs
+              end to end. The demo is the system, not a mockup.
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="px-6 py-6 rounded-lg bg-white/[0.02] border border-white/[0.04]">
@@ -391,9 +401,24 @@ export default function Landing() {
 
       {/* ═══ Footer ═══ */}
       <footer className="border-t border-white/[0.04] py-8 px-6">
-        <div className="max-w-[1080px] mx-auto flex items-center justify-between">
-          <span className="text-[13px] text-slate-600">PE Doc <span className="text-cyan-500/60">Intelligence</span></span>
-          <span className="text-[12px] text-slate-700">Shadow Accounting Engine</span>
+        <div className="max-w-[1080px] mx-auto">
+          <div className="flex items-center justify-between">
+            <span className="text-[14px] font-medium text-slate-300">true<span className="text-cyan-400">fee</span></span>
+            <span className="text-[13px] text-slate-500">Shadow Accounting Engine</span>
+          </div>
+          <div className="mt-4 pt-4 border-t border-white/[0.06] flex flex-wrap items-center gap-x-5 gap-y-2">
+            <span className="text-[13px] text-slate-400">
+              Built by Bhavya Gupta
+            </span>
+            <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer"
+              className="text-[13px] text-slate-400 hover:text-white transition underline underline-offset-2 decoration-white/25">
+              LinkedIn
+            </a>
+            <a href={`mailto:${CONTACT_EMAIL}`}
+              className="text-[13px] text-slate-400 hover:text-white transition underline underline-offset-2 decoration-white/25">
+              Email
+            </a>
+          </div>
         </div>
       </footer>
     </div>
