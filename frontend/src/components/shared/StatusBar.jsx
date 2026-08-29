@@ -25,7 +25,7 @@ export default function StatusBar({ sessionId, evaluating, onBack }) {
         <ArrowLeft size={12} /> Exit
       </button>
       <div className="h-3 w-px bg-white/[0.06] mr-3" />
-      <span className="text-[13px] font-semibold text-white tracking-tight">PE Doc <span className="text-cyan-500">Intelligence</span></span>
+      <span className="text-[13px] font-semibold text-white tracking-tight">true<span className="text-cyan-500">fee</span></span>
 
       <div className="flex-1" />
 
